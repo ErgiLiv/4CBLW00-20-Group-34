@@ -1,3 +1,4 @@
 pandas
-geopandas
+pyarrow
+fastparquet
 matplotlib
