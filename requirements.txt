@@ -6,3 +6,6 @@ tqdm
 geopandas
 requests
 folium
+numpy
+streamlit
+statsmodels
