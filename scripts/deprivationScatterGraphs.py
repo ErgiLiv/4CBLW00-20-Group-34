@@ -41,8 +41,8 @@ def sampleCorelation(X, Y):
 
 
 if __name__ == "__main__":
-    # Load all crime data from December 2019
-    maindf = load_all_crime_data_from_folders('data')
+    # Load all crime data
+    maindf = pd.read_parquet('../data_cache/burglary_cleaned.parquet')
 
     # Filter for burglary crimes only
     maindf = maindf[maindf['Crime type'] == 'Burglary']
