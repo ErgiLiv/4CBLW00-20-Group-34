@@ -23,6 +23,7 @@ Outputs
 -------
 * **ward_month_burglary.parquet** – ward/month table (fast Arrow format)
 * **ward_month_burglary.geojson** – ward/month table with geometries
+* **lsoa_month_burglary.parquet** – LSOA/month table (fast Arrow format)
 
 These live in *data_cache/processed/* and feed every later notebook.
 
@@ -104,6 +105,24 @@ def attach_ward(df: pd.DataFrame, lookup_csv: Path) -> pd.DataFrame:
     return merged.dropna(subset=["WD24CD"])
 
 
+def aggregate_lsoa(df: pd.DataFrame, lookup_csv: Path) -> pd.DataFrame:
+    """Return tidy LSOA-month panel for burglaries."""
+    lsoa_lookup = pd.read_csv(lookup_csv, usecols=["LSOA21CD", "LSOA21NM"])
+    # Assuming 'LSOA code' in df (from ingest_raw) corresponds to 'LSOA21CD'
+    merged_df = df.merge(lsoa_lookup, left_on="LSOA code", right_on="LSOA21CD", how="left")
+    
+    # Drop rows where LSOA code/name couldn't be matched or LSOA21NM is NaN
+    merged_df.dropna(subset=["LSOA21CD", "LSOA21NM", DATE_COL], inplace=True)
+    
+    return (
+        merged_df.groupby([pd.Grouper(key=DATE_COL, freq="MS"), "LSOA21CD", "LSOA21NM"])
+        .size()
+        .rename("burglaries")
+        .reset_index()
+        .sort_values(["Month", "LSOA21CD"])
+    )
+
+
 def attach_geometries(df: pd.DataFrame, geojson_path: Path) -> gpd.GeoDataFrame:
     """Attach ward geometries from GeoJSON file."""
     wards_gdf = gpd.read_file(geojson_path)
@@ -124,19 +143,24 @@ def aggregate(df: pd.DataFrame) -> pd.DataFrame:
     )
 
 
-def save(df: pd.DataFrame, gdf: gpd.GeoDataFrame, out_dir: Path) -> None:
-    """Save both parquet and GeoJSON versions of the data."""
+def save_outputs(ward_df: pd.DataFrame, ward_gdf: gpd.GeoDataFrame, lsoa_df: pd.DataFrame, out_dir: Path) -> None:
+    """Save parquet and GeoJSON versions for wards, and parquet for LSOAs."""
     out_dir.mkdir(parents=True, exist_ok=True)
     
-    # Save parquet (numeric data only)
-    pq = out_dir / "ward_month_burglary.parquet"
-    df.to_parquet(pq, index=False)
-    print(f"✅ Saved {len(df):,} rows → {pq}")
+    # Save ward parquet (numeric data only)
+    ward_pq = out_dir / "ward_month_burglary.parquet"
+    ward_df.to_parquet(ward_pq, index=False)
+    print(f"✅ Saved {len(ward_df):,} ward rows → {ward_pq}")
     
-    # Save GeoJSON (with geometries)
-    geojson = out_dir / "ward_month_burglary.geojson"
-    gdf.to_file(geojson, driver="GeoJSON")
-    print(f"✅ Saved geometries → {geojson}")
+    # Save ward GeoJSON (with geometries)
+    ward_geojson = out_dir / "ward_month_burglary.geojson"
+    ward_gdf.to_file(ward_geojson, driver="GeoJSON")
+    print(f"✅ Saved ward geometries → {ward_geojson}")
+
+    # Save LSOA parquet
+    lsoa_pq = out_dir / "lsoa_month_burglary.parquet"
+    lsoa_df.to_parquet(lsoa_pq, index=False)
+    print(f"✅ Saved {len(lsoa_df):,} LSOA rows → {lsoa_pq}")
 
 # ---------------------------------------------------------------------------
 # CLI wrapper – all args optional -------------------------------------------
@@ -175,13 +199,16 @@ def main():
     with_w = attach_ward(crimes, args.lookup_csv)
 
     print("📅 Aggregating …")
-    panel = aggregate(with_w)
+    panel_ward = aggregate(with_w)
     
-    print("🌍 Attaching geometries …")
-    panel_geo = attach_geometries(panel, args.geojson)
+    print("📈 Aggregating by LSOA …")
+    panel_lsoa = aggregate_lsoa(crimes, args.lookup_csv)
+    
+    print("🌍 Attaching ward geometries …")
+    panel_ward_geo = attach_geometries(panel_ward, args.geojson)
 
     print("💾 Writing outputs …")
-    save(panel, panel_geo, args.out_dir)
+    save_outputs(panel_ward, panel_ward_geo, panel_lsoa, args.out_dir)
     print("Done ✓")
 
 
