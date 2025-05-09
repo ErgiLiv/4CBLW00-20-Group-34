@@ -90,6 +90,31 @@ def load_lsoa_geo() -> gpd.GeoDataFrame | None:
     except FileNotFoundError:
         return None
 
+@st.cache_data
+def load_raw_crime_for_month(selected_month_timestamp: pd.Timestamp) -> pd.DataFrame | None:
+    """Load raw crime data for the selected month, filtered for burglaries."""
+    year_month_str = selected_month_timestamp.strftime('%Y-%m')
+    file_path = ROOT / "data" / year_month_str / f"{year_month_str}-metropolitan-street.csv"
+    
+    try:
+        # Define columns to use, ensure 'Crime type' is included for filtering
+        cols_to_use = ["Month", "Longitude", "Latitude", "Crime type"]
+        df = pd.read_csv(file_path, usecols=lambda c: c in cols_to_use, encoding="utf-8")
+        
+        # Filter for burglary
+        df_burglary = df[df["Crime type"] == "Burglary"].copy()
+        
+        # Drop rows with missing coordinates
+        df_burglary.dropna(subset=["Longitude", "Latitude"], inplace=True)
+        
+        return df_burglary[["Longitude", "Latitude"]]
+    except FileNotFoundError:
+        st.warning(f"Raw data file not found for {year_month_str}. Individual burglary locations cannot be shown.")
+        return None
+    except ValueError as e: # Handles case where not all expected columns are in usecols or file
+        st.warning(f"Could not load all required columns from {file_path} for {year_month_str}: {e}")
+        return None
+
 # Load data
 ward_panel = load_ward_panel()
 lsoa_panel = load_lsoa_panel()
@@ -114,12 +139,27 @@ geo = ward_geo if view_level == "Ward Level" else lsoa_geo
 id_col = "WD24CD" if view_level == "Ward Level" else "LSOA21CD"
 name_col = "WD24NM" if view_level == "Ward Level" else "LSOA21NM"
 
+# Ensure panel is not None before proceeding (especially if LSOA data might be missing)
+if panel is None:
+    st.error("Selected data panel (Ward or LSOA) could not be loaded. Please check data availability.")
+    st.stop()
+
 months = panel["Month"].sort_values().unique()
 def format_m(dt):
     return dt.strftime("%b %Y")
 sel_month = st.sidebar.selectbox("Select month", months, format_func=format_m)
 
 vis_mode = st.sidebar.radio("Show", ["Actual", "Forecast (seasonal naïve)"])
+
+# Disable checkbox if forecast is selected
+disabled_individual_locations = vis_mode.startswith("Forecast")
+show_individual_burglaries = st.sidebar.checkbox("Show individual burglary locations", value=False, disabled=disabled_individual_locations)
+
+# If forecast is selected and the checkbox was previously True, reset it and hide points
+if disabled_individual_locations and st.session_state.get('_show_individual_burglaries_last_value', False):
+    show_individual_burglaries = False 
+# Store the current value for the next run to detect changes
+st.session_state['_show_individual_burglaries_last_value'] = show_individual_burglaries
 
 # ── prepare data ------------------------------------------------------------
 if vis_mode.startswith("Forecast"):
@@ -148,6 +188,9 @@ st.markdown(f"## {subtitle}")
 
 # pydeck map
 mid_lon, mid_lat = -0.1275, 51.5072
+
+deck_layers = []
+
 geojson_layer = pdk.Layer(
     "GeoJsonLayer",
     data=chor.__geo_interface__,
@@ -161,6 +204,38 @@ geojson_layer = pdk.Layer(
     auto_highlight=True,
     highlight_color=[255, 255, 255, 100],
 )
+deck_layers.append(geojson_layer)
+
+if show_individual_burglaries:
+    raw_burglary_df = load_raw_crime_for_month(pd.Period(sel_month, freq="M").to_timestamp())
+    if raw_burglary_df is not None and not raw_burglary_df.empty:
+        # Add white border layer slightly larger than the dots
+        border_layer = pdk.Layer(
+            "ScatterplotLayer",
+            data=raw_burglary_df,
+            get_position=["Longitude", "Latitude"],
+            get_fill_color=[255, 255, 255, 255*0.75],  # White border with 0.75 opacity
+            get_radius=13,  # Slightly larger radius for border
+            radius_min_pixels=6,
+            radius_max_pixels=13,
+            pickable=False
+        )
+        
+        # Main dot layer
+        scatterplot_layer = pdk.Layer(
+            "ScatterplotLayer",
+            data=raw_burglary_df,
+            get_position=["Longitude", "Latitude"],
+            get_fill_color=[0, 0, 255, 255*0.75],  # Blue dots with 0.75 opacity
+            get_radius=10,  # Base radius in meters
+            radius_min_pixels=3,  # Minimum dot size when zoomed in
+            radius_max_pixels=10,  # Maximum dot size when zoomed out
+            pickable=True,
+            auto_highlight=True,
+            highlight_color=[0, 255, 255, 255*0.75]  # Cyan highlight with 0.75 opacity
+        )
+        deck_layers.append(border_layer)
+        deck_layers.append(scatterplot_layer)
 
 tooltip = {
     "html": f"<b>{name_col}:</b> {{{name_col}}}<br/>"
@@ -177,7 +252,7 @@ deck = pdk.Deck(
         latitude=mid_lat,
         zoom=9
     ),
-    layers=[geojson_layer],
+    layers=deck_layers,  # Use the dynamic list of layers
     tooltip=tooltip
 )
 
