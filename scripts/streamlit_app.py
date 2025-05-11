@@ -151,15 +151,22 @@ sel_month = st.sidebar.selectbox("Select month", months, format_func=format_m)
 
 vis_mode = st.sidebar.radio("Show", ["Actual", "Forecast (seasonal naïve)"])
 
+# Handle the session state for the checkbox
+if "show_individual_burglaries" not in st.session_state:
+    st.session_state.show_individual_burglaries = False
+
+# If switching to forecast mode, automatically uncheck the box
+if vis_mode.startswith("Forecast"):
+    st.session_state.show_individual_burglaries = False
+    
 # Disable checkbox if forecast is selected
 disabled_individual_locations = vis_mode.startswith("Forecast")
-show_individual_burglaries = st.sidebar.checkbox("Show individual burglary locations", value=False, disabled=disabled_individual_locations)
-
-# If forecast is selected and the checkbox was previously True, reset it and hide points
-if disabled_individual_locations and st.session_state.get('_show_individual_burglaries_last_value', False):
-    show_individual_burglaries = False 
-# Store the current value for the next run to detect changes
-st.session_state['_show_individual_burglaries_last_value'] = show_individual_burglaries
+show_individual_burglaries = st.sidebar.checkbox(
+    "Show individual burglary locations",
+    value=st.session_state.show_individual_burglaries,
+    disabled=disabled_individual_locations,
+    key="show_individual_burglaries"
+)
 
 # ── prepare data ------------------------------------------------------------
 if vis_mode.startswith("Forecast"):
