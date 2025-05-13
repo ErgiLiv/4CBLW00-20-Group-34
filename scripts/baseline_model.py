@@ -33,6 +33,17 @@ y_test  = y.loc[TEST_START:TEST_END]
 y_pred = y.shift(12)               # forecast = value 12 months ago
 y_pred_test = y_pred.loc[TEST_START:TEST_END]
 
+from pathlib import Path
+forecast_path = Path("model_outputs/baseline_forecast.parquet")
+
+(  # pivot-wide back to long and save
+    y_pred        # DataFrame, index = month, cols = lsoa
+      .stack()    # → long Series with MultiIndex (month, lsoa)
+      .reset_index(name="pred_count")   # columns: month, lsoa, pred_count
+      .to_parquet(forecast_path, index=False)
+)
+print("✅  saved baseline forecast →", forecast_path)
+
 # 4. Evaluate MAE  -----------------------------------------------------
 diff = (y_test - y_pred_test).abs()
 

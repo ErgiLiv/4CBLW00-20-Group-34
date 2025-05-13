@@ -1,4 +1,7 @@
 pandas
+geopandas
+matplotlib
+seaborn
+contextily
 pyarrow
 fastparquet
-matplotlib
