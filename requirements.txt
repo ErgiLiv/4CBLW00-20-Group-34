@@ -1,6 +1,5 @@
 pandas
-pyarrow
-fastparquet
+geopandas
 matplotlib
 tqdm
 geopandas
@@ -9,3 +8,7 @@ folium
 numpy
 streamlit
 statsmodels
+seaborn
+contextily
+pyarrow
+fastparquet
