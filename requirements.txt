@@ -1,0 +1,11 @@
+pandas
+pyarrow
+fastparquet
+matplotlib
+tqdm
+geopandas
+requests
+folium
+numpy
+streamlit
+statsmodels
