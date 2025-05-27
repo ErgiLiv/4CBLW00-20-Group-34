@@ -9,3 +9,5 @@ folium
 numpy
 streamlit
 statsmodels
+xgboost
+scikit-learn
