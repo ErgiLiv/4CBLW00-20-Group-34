@@ -35,7 +35,7 @@ LSOA_PANEL_FP = DATA / "lsoa_month_burglary.parquet"
 WARD_GEO_JSON = LOOK / "wards_2024.geojson"
 LSOA_GEO_JSON = LOOK / "LSOA21_Boundaries.geojson"  # Corrected filename
 LOOKUP_CSV = LOOK / "LSOA21_WD24_Lookup.csv"
-XGBOOST_PRED_CSV = PRED / "ward_burglary_predictions_next_month.csv"
+XGBOOST_PRED_CSV = PRED / "ward_burglary_predictions.csv"
 
 # Configure Streamlit page settings
 st.set_page_config(layout="wide")
