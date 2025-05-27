@@ -1,0 +1,650 @@
+Ward,Predicted_Burglaries,Previous_Month_Actual,Population
+West End,35.7,32,12445.0
+Marylebone,28.8,34,12676.0
+Bayswater,24.4,27,12649.0
+Hoxton East & Shoreditch,21.7,22,12079.0
+Bloomsbury,21.5,21,13111.0
+St James's,21.4,18,11075.0
+Crouch End,20.1,21,12608.0
+London Bridge & West Bermondsey,17.9,17,15454.0
+Junction,17.5,16,13082.0
+Hillrise,17.3,15,14829.0
+Hayes Town,17.2,18,15787.0
+Waterloo & South Bank,17.0,15,9657.0
+Borough & Bankside,16.5,17,10171.0
+Holborn & Covent Garden,16.0,16,11399.0
+Rotherhithe,15.3,15,15990.0
+Fairfield,15.3,14,16261.0
+Hyde Park,15.3,13,11726.0
+Queen's Park,15.1,12,12627.0
+Pembridge,15.1,13,5537.0
+Stratford,15.0,15,16661.0
+Faraday,14.9,14,12183.0
+Spitalfields & Banglatown,14.6,14,13908.0
+North Greenford,14.3,16,15834.0
+Ponders End,14.3,13,13766.0
+North Bermondsey,13.9,14,15086.0
+Canary Wharf,13.8,14,20147.0
+Church Street,13.8,10,11760.0
+Jubilee,13.7,15,16425.0
+Finchley Church End,13.7,15,18783.0
+Streatham St Leonard's,13.7,12,15752.0
+Northolt Mandeville,13.7,14,17571.0
+Pinkwell,13.4,15,17077.0
+Abbey Road,13.4,13,13458.0
+Belsize,13.2,14,12548.0
+Tollington,13.1,14,13940.0
+Totteridge & Woodside,13.1,12,14820.0
+Northumberland Park,13.0,10,14488.0
+Greenwich Peninsula,13.0,12,12475.0
+Earl's Court,13.0,13,9175.0
+Brunswick Park,13.0,12,15935.0
+Rye Lane,12.9,12,14861.0
+Mortlake & Barnes Common,12.9,14,11987.0
+Newington,12.8,10,13351.0
+St Pancras & Somers Town,12.8,11,13412.0
+Harrow Road,12.7,9,11514.0
+Eastbury,12.7,9,15294.0
+Stanmore,12.6,9,13596.0
+Brixton North,12.6,8,16106.0
+Nunhead & Queen's Road,12.6,9,15539.0
+Brimsdown,12.5,12,16397.0
+Wood End,12.5,13,19701.0
+Clapham Town,12.4,12,15770.0
+Uxbridge,12.4,14,18527.0
+Haverstock,12.3,11,12051.0
+North Walworth,12.2,9,17461.0
+Northwood Hills,12.2,9,11688.0
+Noel Park,12.1,10,13696.0
+Upper Edmonton,12.1,12,16306.0
+Edmonton Green,12.1,10,16728.0
+South Tottenham,12.0,9,16631.0
+Harlesden & Kensal Green,12.0,10,20064.0
+Herne Hill & Loughborough Junction,12.0,12,15993.0
+Bickley & Sundridge,12.0,10,17771.0
+Mile End,11.9,9,22454.0
+Kilburn,11.8,11,16668.0
+Shaftesbury & Queenstown,11.7,10,15038.0
+Hoe Street,11.7,11,14119.0
+Hendon,11.6,13,22025.0
+Whitechapel,11.6,9,21365.0
+Regent's Park,11.6,9,12508.0
+Northwood,11.6,10,11241.0
+Knightsbridge & Belgravia,11.6,9,11627.0
+Loxford,11.6,11,15401.0
+Westbourne,11.5,8,11757.0
+Primrose Hill,11.4,12,12903.0
+Cann Hall,11.4,11,15998.0
+Munster,11.3,9,12099.0
+West Finchley,11.3,14,19382.0
+Headstone,11.3,9,15024.0
+Belmore,11.3,12,17646.0
+Boleyn,11.3,10,15680.0
+De Beauvoir,11.3,10,9163.0
+Plaistow West & Canning Town East,11.3,9,17527.0
+Pinner South,11.2,8,15536.0
+East Ham,11.1,12,15491.0
+Yeading,11.1,8,13462.0
+Edgware,11.1,13,19761.0
+Tottenham Hale,11.0,8,12798.0
+South Ruislip,11.0,10,17003.0
+Highgate,11.0,12,10151.0
+Regent's Park,11.0,9,12258.0
+South Bermondsey,11.0,11,15940.0
+Plumstead Common,10.9,9,15085.0
+Kentish Town South,10.9,10,10710.0
+Stonebridge,10.9,11,20719.0
+Lansbury,10.9,8,22348.0
+Rushey Green,10.9,8,18585.0
+Colham & Cowley,10.8,9,19630.0
+Holloway,10.8,9,13695.0
+Leytonstone,10.8,9,11856.0
+Harrow Weald,10.8,9,14250.0
+Crystal Palace & Upper Norwood,10.7,9,16798.0
+Purley & Woodcote,10.7,10,15594.0
+Norbury & Pollards Hill,10.7,10,12202.0
+Bromley Town,10.7,9,15519.0
+Southall Broadway,10.6,8,11167.0
+Brondesbury Park,10.6,9,13246.0
+Heathrow Villages,10.6,9,15629.0
+Greenford Broadway,10.5,9,17614.0
+Canning Town North,10.5,11,10674.0
+Beckenham Town & Copers Cope,10.4,10,16289.0
+Vauxhall,10.4,7,10647.0
+West Hampstead,10.4,10,11229.0
+Edgware,10.4,9,16055.0
+West Thornton,10.4,12,19073.0
+North Acton,10.3,10,19558.0
+Fortune Green,10.3,9,11703.0
+Deptford,10.3,11,17267.0
+Brownswood,10.3,9,9002.0
+Fullwell,10.3,9,15352.0
+East Greenwich,10.3,8,14901.0
+St Katharine's & Wapping,10.2,10,12224.0
+Golders Green,10.2,9,14817.0
+Stepney Green,10.2,7,12847.0
+Dollis Hill,10.1,8,21751.0
+Cricklewood & Mapesbury,10.1,8,13855.0
+Mill Hill,10.1,9,18605.0
+Pimlico North,10.1,11,10621.0
+Thamesfield,10.1,10,16751.0
+Hackney Central,10.1,8,12844.0
+Newbury,10.1,12,14293.0
+Caledonian,10.0,8,12593.0
+Chaucer,10.0,8,14867.0
+Homerton,10.0,8,13983.0
+Forest Gate South,10.0,9,17900.0
+Old Kent Road,9.9,7,19276.0
+South Croydon,9.9,9,18005.0
+Hanwell Broadway,9.9,8,15373.0
+Forest,9.8,8,17032.0
+St Dunstan's,9.7,7,14927.0
+King's Cross,9.6,6,12152.0
+Lancaster Gate,9.6,10,11082.0
+Brompton & Hans Town,9.5,9,8229.0
+White Hart Lane,9.5,7,13704.0
+Childs Hill,9.5,10,19696.0
+Town,9.5,9,13461.0
+Southbury,9.5,8,15645.0
+Roehampton,9.5,8,19096.0
+Abbey Wood,9.5,7,17661.0
+College Park & Old Oak,9.5,8,10661.0
+Greenhill,9.4,8,11777.0
+Heston Central,9.4,8,14968.0
+Central Greenford,9.4,11,14571.0
+Winchmore Hill,9.4,9,10226.0
+Blackwall & Cubitt Town,9.4,7,23818.0
+Pinner,9.4,7,12829.0
+Pitshanger,9.3,8,14903.0
+Burnt Oak,9.3,8,21498.0
+Highgate,9.3,11,12733.0
+Brockley,9.3,7,17441.0
+Highbury,9.3,7,13711.0
+Cricklewood,9.3,7,10699.0
+Raynes Park,9.2,7,12348.0
+Dalston,9.2,8,8906.0
+Nine Elms,9.2,6,6000.0
+Ravensbury,9.2,8,9451.0
+Kelsey & Eden Park,9.2,8,15587.0
+Carshalton Central,9.2,7,11472.0
+Maida Vale,9.2,7,11969.0
+Plumstead & Glyndon,9.1,7,22114.0
+Shepherd's Bush Green,9.0,7,5650.0
+Shadwell,9.0,7,13543.0
+Camden Town,9.0,6,6575.0
+Roxbourne,8.9,7,9803.0
+Balham,8.9,7,17549.0
+Village,8.9,7,12552.0
+Mawneys,8.8,8,14760.0
+Tottenham Central,8.8,6,14706.0
+Grove,8.8,8,7480.0
+Waddon,8.8,7,18672.0
+Park Hill & Whitgift,8.8,11,5734.0
+Lower Edmonton,8.8,7,16434.0
+Cricket Green,8.7,7,11677.0
+Forest Hill,8.7,7,15079.0
+West Hendon,8.7,8,17189.0
+Wealdstone South,8.6,8,7997.0
+Woodberry Down,8.6,7,12289.0
+Northbury,8.6,7,13082.0
+Brixton Acre Lane,8.6,5,15079.0
+Chingford Green,8.6,8,11414.0
+Brixton Windrush,8.4,5,9358.0
+Higham Hill,8.4,6,14048.0
+Wimbledon Park,8.4,7,10825.0
+Bethnal Green East,8.4,6,22336.0
+Ilford Town,8.4,7,12569.0
+Gospel Oak,8.3,6,11660.0
+Seven Kings,8.3,7,15157.0
+Hanworth Park,8.3,7,10502.0
+Welsh Harp,8.3,8,17704.0
+Wallington South,8.2,7,11139.0
+Clapham East,8.2,3,9874.0
+Crofton Park,8.1,7,15220.0
+St Mary's & St James',8.1,5,12161.0
+Hammersmith Broadway,8.1,5,7752.0
+Little Ilford,8.1,7,17293.0
+London Fields,8.1,7,12891.0
+Broad Green,8.1,7,20461.0
+Petts Wood & Knoll,8.0,6,17378.0
+Aldborough,8.0,8,15424.0
+Tufnell Park,8.0,6,12444.0
+Queensbury,8.0,8,17331.0
+Ealing Broadway,8.0,7,14295.0
+North Hanwell,8.0,6,14950.0
+Perry Vale,8.0,7,18320.0
+Sidcup,8.0,7,15584.0
+Hanworth Village,7.9,6,16203.0
+Kenton,7.9,8,17578.0
+Gipsy Hill,7.9,6,10052.0
+Norwood Green,7.9,6,16522.0
+Peckham Rye,7.9,7,10035.0
+Highfield,7.9,7,9315.0
+Valley,7.8,6,14078.0
+William Morris,7.8,6,14850.0
+Perivale,7.8,8,16190.0
+Stroud Green,7.8,7,10542.0
+Ealing Common,7.8,7,15904.0
+Hounslow West,7.8,7,15896.0
+Colindale South,7.8,7,20638.0
+Brook Green,7.8,8,8414.0
+Royal Victoria,7.7,5,15590.0
+Twickenham Riverside,7.7,7,11030.0
+Heston West,7.7,6,15738.0
+Barnsbury,7.6,5,11505.0
+Penge & Cator,7.6,7,18772.0
+Edgwarebury,7.6,7,12196.0
+Victoria,7.6,5,12332.0
+Plaistow North,7.6,7,18200.0
+Bruce Castle,7.5,4,13430.0
+Osterley & Spring Grove,7.5,7,14708.0
+Colindale North,7.5,5,11975.0
+Seven Sisters,7.5,6,9016.0
+New Addington South,7.5,4,11320.0
+Kennington,7.5,5,14497.0
+Lewisham Central,7.5,2,8704.0
+Woodside,7.4,5,15013.0
+Tooting Bec,7.4,7,16995.0
+Hornsey,7.4,6,14738.0
+Arnos Grove,7.4,8,8102.0
+St Mary Cray,7.4,6,18448.0
+Lavender Fields,7.4,6,11256.0
+Sutton Central,7.4,6,12978.0
+St Helier West,7.4,6,12115.0
+Brentford West,7.3,4,7720.0
+Centenary,7.3,6,15101.0
+Southfield,7.3,7,16184.0
+Haggerston,7.3,5,14551.0
+Trinity,7.3,6,11076.0
+Stockwell West & Larkhall,7.2,5,16181.0
+Chelsea Riverside,7.2,4,7867.0
+Weavers,7.2,5,13618.0
+Blackheath,7.2,6,16444.0
+Barnet Vale,7.2,7,16617.0
+Hounslow Central,7.2,6,11039.0
+Hither Green,7.1,6,20014.0
+St George's,7.1,1,8792.0
+Abbey,7.1,5,4199.0
+Ruislip,7.1,5,15460.0
+St Paul's Cray,7.0,5,17252.0
+Fortis Green,7.0,7,12182.0
+Falconbrook,7.0,4,12199.0
+Peckham,7.0,4,14992.0
+Ridgeway,7.0,5,12500.0
+Selhurst,7.0,4,13154.0
+St Martin's,7.0,6,10806.0
+Kilburn,6.9,2,12311.0
+Slade Green & Northend,6.9,3,12968.0
+St Mary's & St James,6.9,6,10876.0
+Hoxton West,6.9,5,14119.0
+Roundwood,6.9,4,16498.0
+Walpole,6.9,6,14792.0
+Addison,6.8,5,7626.0
+Falconwood & Welling,6.8,6,16773.0
+Roxeth,6.8,7,15745.0
+Mottingham,6.8,4,11429.0
+Notting Dale,6.8,5,8823.0
+Barnhill,6.8,6,11236.0
+Willesden Green,6.7,6,18980.0
+Battersea Park,6.7,6,19617.0
+Bullsmoor,6.7,4,11414.0
+Colville,6.7,5,8470.0
+Thornton Heath,6.6,5,17845.0
+Hanger Hill,6.6,6,17288.0
+Camden Square,6.6,5,7649.0
+Cockfosters,6.6,6,10688.0
+Coningham,6.6,6,10606.0
+Whitewebbs,6.6,6,13855.0
+Finsbury Park,6.6,3,14849.0
+Havering-atte-Bower,6.6,4,16486.0
+Evelyn,6.6,5,14293.0
+Clapham Common & Abbeville,6.5,5,10050.0
+Clock House,6.5,6,17382.0
+Parsloes,6.5,4,15373.0
+Tooting Broadway,6.5,5,17159.0
+Berrylands,6.5,6,6096.0
+West Thamesmead,6.5,1,11324.0
+Bensham Manor,6.5,5,17071.0
+Bedfont,6.4,5,15215.0
+Gooshays,6.4,3,17825.0
+Laycock,6.4,4,12289.0
+Bellingham,6.4,1,11334.0
+Kenton East,6.4,6,13640.0
+Courtfield,6.4,3,9044.0
+Garden Suburb,6.4,7,12237.0
+Bunhill,6.4,5,11872.0
+East Wickham,6.4,5,16087.0
+Leyton,6.4,5,13022.0
+Bow West,6.3,3,14215.0
+Thamesmead Moorings,6.3,3,12152.0
+South Acton,6.3,4,16880.0
+St Peter's & Canalside,6.3,4,12286.0
+Green Street East,6.3,5,17522.0
+Woolwich Dockyard,6.2,4,11459.0
+Fulham Reach,6.2,6,12416.0
+Blackfen & Lamorbey,6.2,3,16704.0
+Belmont,6.2,6,8870.0
+West Green,6.2,2,14895.0
+Heaton,6.2,3,17460.0
+Norbiton,6.2,5,11188.0
+Belvedere,6.2,5,17594.0
+Lea Bridge,6.2,4,13958.0
+Feltham North,6.1,4,14102.0
+East Acton,6.1,4,15459.0
+Barnehurst,6.1,5,11778.0
+Avonmore,6.1,6,7619.0
+Vincent Square,6.1,3,10710.0
+Stockwell East,6.1,5,10619.0
+Brentford East,6.1,4,8924.0
+Streatham Common & Vale,6.0,5,17594.0
+Bethnal Green West,6.0,4,20399.0
+Beam Park,6.0,5,5536.0
+Ladywell,6.0,3,15512.0
+Harringay,6.0,4,14455.0
+Yiewsley,6.0,5,12982.0
+West Hill,6.0,5,16830.0
+Springfield,6.0,5,15707.0
+Woodside,6.0,4,16758.0
+West Drayton,6.0,5,18467.0
+Charlton Hornfair,6.0,3,12149.0
+Blackheath Westcombe,6.0,6,14975.0
+Feltham West,6.0,4,16247.0
+Dalgarno,6.0,4,7133.0
+South Norwood,5.9,3,16342.0
+Chislehurst,5.9,6,15377.0
+Sydenham,5.9,4,16964.0
+East Ham South,5.9,5,18335.0
+Lea Bridge,5.9,4,15535.0
+East Barnet,5.9,5,17763.0
+Kentish Town North,5.9,6,7236.0
+Eastcote,5.8,4,16946.0
+Shacklewell,5.8,5,9117.0
+East Putney,5.8,4,17056.0
+Canonbury,5.8,3,12293.0
+Tolworth,5.8,6,11199.0
+Plaistow South,5.8,4,13313.0
+Wood Street,5.8,4,9555.0
+Rush Green & Crowlands,5.8,4,16288.0
+Thamesmead East,5.8,3,15958.0
+Syon & Brentford Lock,5.8,4,13051.0
+Bromley North,5.8,2,11904.0
+Northfield,5.8,6,14076.0
+Crystal Palace & Anerley,5.8,3,11892.0
+Shortlands & Park Langley,5.7,4,16289.0
+East Finchley,5.7,5,16521.0
+Bromley South,5.7,3,14505.0
+Eltham Town & Avery Hill,5.7,6,16002.0
+Redcliffe,5.7,6,9323.0
+Northolt West End,5.7,4,16776.0
+Myatt's Fields,5.7,1,10850.0
+St James,5.7,4,12190.0
+South Richmond,5.7,5,11155.0
+High Street,5.7,4,11636.0
+Queen's Gate,5.7,5,8302.0
+Oval,5.7,3,13023.0
+Carterhatch,5.7,3,12151.0
+Fulham Town,5.6,5,7374.0
+South Beddington & Roundshaw,5.6,4,11066.0
+Bow East,5.6,3,20342.0
+West Kensington,5.6,5,9303.0
+Arsenal,5.6,3,13007.0
+Bush Hill Park,5.6,6,12496.0
+Dulwich Wood,5.6,5,10404.0
+Telegraph Hill,5.6,3,16456.0
+Custom House,5.6,4,17765.0
+Wembley Park,5.6,5,10526.0
+Kingsbury,5.6,6,10955.0
+Lavender,5.6,4,13551.0
+Queens Park,5.6,5,16682.0
+St Mary's,5.5,5,14622.0
+Hackney Wick,5.5,3,12694.0
+Farnborough & Crofton,5.5,4,17723.0
+Island Gardens,5.5,4,15798.0
+Mayfield,5.5,6,16244.0
+Addiscombe West,5.5,3,15821.0
+Haselbury,5.5,4,17919.0
+Carshalton South & Clockhouse,5.5,4,9792.0
+St Giles,5.5,4,15892.0
+Walham Green,5.5,4,7905.0
+West Ham,5.5,4,15779.0
+Shirley North,5.5,3,15300.0
+Poplar,5.4,3,8302.0
+East Sheen,5.4,5,10585.0
+Limehouse,5.4,4,6789.0
+South Hornchurch,5.4,2,11090.0
+Campden,5.4,6,8883.0
+Golborne,5.4,2,8608.0
+Chelsfield,5.4,3,11287.0
+Upper Walthamstow,5.3,4,8144.0
+Hounslow East,5.3,5,8725.0
+Wembley Hill,5.3,5,15577.0
+West Dulwich,5.3,4,10910.0
+Southall Green,5.3,4,15884.0
+South Woodford,5.3,5,12783.0
+Harold Wood,5.3,4,13972.0
+Figge's Marsh,5.3,1,11726.0
+West Heath,5.3,3,15962.0
+Kidbrooke Park,5.3,4,10120.0
+Hatch Lane & Highams Park North,5.2,5,12831.0
+Cranford,5.2,4,16165.0
+Hayes & Coney Hall,5.2,3,15963.0
+King's Park,5.2,1,13071.0
+Clissold,5.2,3,12544.0
+Gascoigne,5.2,3,11029.0
+Canons,5.2,4,9576.0
+Little Venice,5.2,4,10793.0
+Mildmay,5.2,3,14238.0
+South Hampstead,5.1,5,12659.0
+Dormers Wells,5.1,4,15737.0
+New Cross Gate,5.1,4,10771.0
+Surbiton Hill,5.1,5,10711.0
+Sanderstead,5.1,2,15777.0
+Woolwich Common,5.1,2,12855.0
+Brixton Rush Common,5.0,1,14700.0
+Grove Park,5.0,2,15621.0
+Dulwich Village,5.0,4,10432.0
+Hatch End,5.0,3,9655.0
+Hacton,5.0,3,8680.0
+Upminster,5.0,3,13369.0
+Forest Gate North,5.0,3,11029.0
+Canning Town South,5.0,1,7721.0
+Wormholt,4.9,3,8062.0
+Green Street West,4.9,4,16114.0
+Palmers Green,4.9,5,10727.0
+"Mottingham, Coldharbour & New Eltham",4.9,1,14586.0
+Hampton Wick & South Teddington,4.9,6,10609.0
+Surrey Docks,4.9,5,13122.0
+Shooters Hill,4.9,4,11721.0
+"Ham, Petersham & Richmond Riverside",4.9,4,10823.0
+Clerkenwell,4.9,3,11579.0
+Wandsworth Town,4.9,4,18375.0
+New Southgate,4.9,4,11846.0
+Valence,4.9,3,15329.0
+Greenwich Creekside,4.9,4,10958.0
+Charlton Village & Riverside,4.9,3,10373.0
+Beam,4.9,5,8621.0
+Wembley Central,4.9,5,18024.0
+Manor Park,4.8,3,15902.0
+Colliers Wood,4.8,3,11532.0
+Crook Log,4.8,3,15308.0
+Markhouse,4.8,2,9094.0
+Hillingdon East,4.8,3,15742.0
+Goresbrook,4.8,2,13130.0
+Lady Margaret,4.8,3,15680.0
+Wealdstone North,4.7,4,10530.0
+St Helier,4.7,1,11317.0
+Pollards Hill,4.7,2,11682.0
+Whetstone,4.7,5,10846.0
+West Wickham,4.7,2,14642.0
+Blendon & Penhill,4.7,2,15505.0
+Coulsdon Town,4.7,2,15558.0
+Enfield Lock,4.7,3,17709.0
+Addiscombe East,4.7,4,11414.0
+Longbridge,4.7,3,13415.0
+Whalebone,4.7,3,13809.0
+Graveney,4.7,3,11818.0
+Crayford,4.7,4,16441.0
+Knight's Hill,4.7,2,16692.0
+Wandle,4.6,4,5832.0
+Middle Park & Horn Park,4.6,2,9475.0
+Clapham Park,4.6,2,12455.0
+Stoke Newington,4.6,2,13357.0
+Greenwich Park,4.6,4,11111.0
+Hounslow Heath,4.6,2,16031.0
+Northcote,4.6,3,12626.0
+Goodmayes,4.5,3,15493.0
+Wallington North,4.5,3,12145.0
+Cheam,4.5,1,10704.0
+Bridge,4.5,5,13179.0
+Chapel End,4.5,4,13356.0
+Old Coulsdon,4.5,3,10034.0
+Chiswick Homefields,4.5,4,13725.0
+Chiswick Gunnersbury,4.5,5,12746.0
+Chiswick Riverside,4.5,4,10209.0
+Cranham,4.5,2,12927.0
+Southgate,4.5,3,14391.0
+Elm Park,4.5,2,16857.0
+Clementswood,4.5,2,13551.0
+Sutton South,4.4,2,12220.0
+St. Helen's,4.4,2,6248.0
+Alperton,4.4,4,14783.0
+New Malden Village,4.4,4,9421.0
+Eltham Page,4.4,3,9808.0
+Thames View,4.4,1,6160.0
+Kenley,4.4,1,11008.0
+White City,4.4,1,10621.0
+Teddington,4.3,4,10451.0
+Harefield Village,4.3,1,5640.0
+Hackbridge,4.3,2,6811.0
+Downham,4.3,2,18272.0
+Goose Green,4.3,2,13727.0
+Grove Green,4.3,4,14557.0
+Larkswood,4.3,3,13427.0
+Maryland,4.3,2,12690.0
+Heston East,4.3,3,11221.0
+St Andrew's,4.3,3,14437.0
+Shirley South,4.3,3,10514.0
+West Putney,4.3,3,17012.0
+Frognal,4.3,3,7961.0
+North Harrow,4.3,3,8875.0
+Underhill,4.2,2,12243.0
+Hook & Chessington North,4.2,2,11058.0
+Catford South,4.2,2,17449.0
+Belmont,4.2,2,11847.0
+South Twickenham,4.2,4,10658.0
+Royal Hospital,4.2,3,8593.0
+Barking Riverside,4.2,2,10057.0
+High Barnet,4.2,4,11921.0
+Worcester Park South,4.1,1,7119.0
+Ruislip Manor,4.1,2,10892.0
+Holland,4.1,5,9372.0
+Cranbrook,4.1,5,13111.0
+Oakwood,4.1,2,8702.0
+Southfields,4.1,1,12648.0
+Mayesbrook,4.1,1,15837.0
+Hillside,4.1,3,8028.0
+Merton Park,4.1,3,8246.0
+Woolwich Arsenal,4.1,2,12603.0
+Isleworth,4.1,1,13741.0
+Chadwell Heath,4.1,2,14346.0
+Hackney Downs,4.1,2,12973.0
+Clayhall,4.0,4,14293.0
+St Mark's & Seething Wells,4.0,2,11684.0
+Hainault,4.0,1,15883.0
+Bowes,4.0,2,10709.0
+Hermitage & Gardens,4.0,2,8585.0
+Eastbrook & Rush Green,4.0,1,8958.0
+Friern Barnet,4.0,5,19118.0
+Selsdon & Addington Village,4.0,3,10032.0
+Orpington,4.0,2,11960.0
+Erith,4.0,2,13271.0
+Becontree,4.0,1,9880.0
+Hillingdon West,4.0,4,10004.0
+Kingston Town,3.9,4,10707.0
+St Helier East,3.9,1,8501.0
+Sutton North,3.9,3,11308.0
+St Margarets & North Twickenham,3.9,2,11913.0
+Ravenscourt,3.9,1,6992.0
+Bounds Green,3.9,1,9792.0
+Ickenham & South Harefield,3.9,1,15485.0
+Cazenove,3.9,2,15483.0
+Lee Green,3.9,2,14907.0
+Hale End & Highams Park South,3.8,2,9539.0
+Churchfields,3.8,3,15398.0
+Wanstead Village,3.8,4,12609.0
+Beddington,3.8,4,11073.0
+Streatham Hill East,3.7,2,9713.0
+Squirrels Heath,3.7,1,15620.0
+Heath,3.7,1,9060.0
+Norbury Park,3.7,1,10989.0
+Marshalls & Rise Park,3.7,3,12949.0
+South Balham,3.7,3,9624.0
+Kew,3.7,1,11908.0
+Camberwell Green,3.7,1,15615.0
+Wimbledon Town & Dundonald,3.7,1,12819.0
+Bexleyheath,3.7,3,15819.0
+Plashet,3.7,1,11969.0
+King George's & Sunray,3.7,2,5801.0
+Coombe Vale,3.7,2,10447.0
+Wandsworth Common,3.7,2,16460.0
+Endlebury,3.6,3,9251.0
+Purley Oaks & Riddlesdown,3.6,3,9961.0
+Barnes,3.6,3,10248.0
+Green Lane & St James,3.6,2,6939.0
+Chessington South & Malden Rushett,3.6,1,9296.0
+The Wrythe,3.6,2,10937.0
+Alexandra,3.5,2,6386.0
+Stamford Hill West,3.5,3,10428.0
+Preston,3.5,2,12488.0
+Emerson Park,3.5,1,9579.0
+St Alban's,3.5,1,9011.0
+Parsons Green & Sandford,3.5,2,7684.0
+Eltham Park & Progress,3.4,2,10821.0
+Sutton West & East Cheam,3.4,3,10737.0
+Sands End,3.4,2,11448.0
+Hampstead Town,3.4,3,8121.0
+St Edward's,3.3,3,10570.0
+Lower Morden,3.3,3,11331.0
+Rayners Lane,3.3,4,9026.0
+Hampton,3.3,2,10208.0
+Palace & Hurlingham,3.3,2,11252.0
+Abingdon,3.3,3,8247.0
+Fulwell & Hampton Hill,3.2,2,10757.0
+Cannon Hill,3.2,1,9866.0
+Canbury Gardens,3.2,2,8127.0
+Royal Albert,3.2,1,9453.0
+Worcester Park North,3.2,1,8410.0
+Longlands,3.1,1,10002.0
+Wendell Park,3.1,1,7299.0
+Bromley Common & Holwood,3.1,3,18909.0
+Northwick Park,3.1,2,12410.0
+Monkhams,3.1,3,9600.0
+Sudbury,3.1,2,13889.0
+Fairlop,3.1,2,14807.0
+Kidbrooke Village & Sutcliffe,3.0,4,6352.0
+Kenton West,3.0,2,9847.0
+Chadwell,3.0,2,16417.0
+Harrow on the Hill,2.9,2,10731.0
+Champion Hill,2.9,1,9108.0
+West Twickenham,2.9,1,11237.0
+Stanley,2.8,3,8682.0
+West Barnes,2.7,1,10606.0
+Coombe Hill,2.7,1,7537.0
+Abbey,2.7,1,10449.0
+Dulwich Hill,2.7,2,9615.0
+Woodhouse,2.7,3,13816.0
+Motspur Park & Old Malden East,2.7,1,7001.0
+Norland,2.6,2,5618.0
+Streatham Wells,2.6,2,9901.0
+Whitton,2.6,2,10426.0
+Barkingside,2.5,1,15672.0
+Hampton North,2.5,1,9783.0
+North Richmond,2.5,2,10708.0
+Tokyngton,2.5,2,10257.0
+Wandle,2.4,1,10624.0
+Charville,2.3,1,11672.0
+Plaistow,2.3,3,13391.0
+Heathfield,2.2,2,10408.0
+Alexandra Park,2.2,1,8696.0
+Muswell Hill,2.1,1,8706.0
+Wanstead Park,2.0,1,8125.0

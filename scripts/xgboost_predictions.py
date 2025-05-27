@@ -311,6 +311,12 @@ def main():
     print("\nPredicting next month's burglaries...")
     predictions = predict_next_month(model, df, feature_cols, scaler)
     print(predictions.head(10))
+    
+    # Save predictions to CSV
+    output_path = "./predictions/ward_burglary_predictions_next_month.csv"
+    print(f"\nSaving predictions to {output_path}...")
+    predictions.to_csv(output_path, index=False)
+    print("Predictions saved successfully!")
 
 if __name__ == "__main__":
     main()
