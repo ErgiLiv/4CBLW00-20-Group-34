@@ -17,6 +17,7 @@ from __future__ import annotations
 import pathlib
 import streamlit as st
 import pandas as pd
+import numpy as np
 import geopandas as gpd
 import pydeck as pdk
 import matplotlib.cm as cm
@@ -27,12 +28,14 @@ import matplotlib.pyplot as plt
 ROOT = pathlib.Path(__file__).resolve().parent.parent  # Go up one level to project root
 DATA = ROOT / "data_cache" / "processed"
 LOOK = ROOT / "data_cache" / "lookups"
+PRED = ROOT / "predictions"
 
 WARD_PANEL_FP = DATA / "ward_month_burglary.parquet"
 LSOA_PANEL_FP = DATA / "lsoa_month_burglary.parquet"
 WARD_GEO_JSON = LOOK / "wards_2024.geojson"
 LSOA_GEO_JSON = LOOK / "LSOA21_Boundaries.geojson"  # Corrected filename
 LOOKUP_CSV = LOOK / "LSOA21_WD24_Lookup.csv"
+XGBOOST_PRED_CSV = PRED / "ward_burglary_predictions_next_month.csv"
 
 # Configure Streamlit page settings
 st.set_page_config(layout="wide")
@@ -115,19 +118,41 @@ def load_raw_crime_for_month(selected_month_timestamp: pd.Timestamp) -> pd.DataF
         st.warning(f"Could not load all required columns from {file_path} for {year_month_str}: {e}")
         return None
 
+@st.cache_data
+def load_xgboost_predictions() -> pd.DataFrame:
+    """Load XGBoost predictions for next month."""
+    df = pd.read_csv(XGBOOST_PRED_CSV)
+    # Since this is next month prediction, we'll create the date for the next month
+    next_month = pd.Timestamp.now() + pd.DateOffset(months=1)
+    df['Month'] = next_month.replace(day=1)  # First day of next month
+    return df
+
 # Load data
 ward_panel = load_ward_panel()
 lsoa_panel = load_lsoa_panel()
 ward_geo = load_ward_geo()
 lsoa_geo = load_lsoa_geo()
+xgboost_pred = load_xgboost_predictions()
+
+# Get available months for both historical and next month forecast
+historical_months = ward_panel["Month"].sort_values().unique()
+forecast_month = xgboost_pred["Month"].iloc[0]  # Just one month for forecast
 
 # ── sidebar controls --------------------------------------------------------
 st.sidebar.title("London Burglary Dashboard")
 
-view_level = st.sidebar.radio("View Level", 
-    options=["Ward Level", "LSOA Level"],
-    help="Ward Level shows data aggregated by electoral ward. LSOA (Lower Super Output Area) Level shows more detailed data at a smaller geographic level."
+# Force Ward level when in forecast mode
+view_mode = st.sidebar.radio("Type of Analysis",
+    options=["Historical Data", "Next Month Forecast"],
+    help="Historical Data shows actual burglary counts. Next Month Forecast shows predicted burglaries for next month using XGBoost model."
 )
+
+view_level = "Ward Level"
+if view_mode == "Historical Data":
+    view_level = st.sidebar.radio("View Level", 
+        options=["Ward Level", "LSOA Level"],
+        help="Ward Level shows data aggregated by electoral ward. LSOA (Lower Super Output Area) Level shows more detailed data at a smaller geographic level."
+    )
 
 if view_level == "LSOA Level" and (lsoa_panel is None or lsoa_geo is None):
     st.sidebar.error("LSOA level data is not available yet. Please use Ward Level view.")
@@ -139,41 +164,42 @@ geo = ward_geo if view_level == "Ward Level" else lsoa_geo
 id_col = "WD24CD" if view_level == "Ward Level" else "LSOA21CD"
 name_col = "WD24NM" if view_level == "Ward Level" else "LSOA21NM"
 
-# Ensure panel is not None before proceeding (especially if LSOA data might be missing)
+# Ensure panel is not None before proceeding
 if panel is None:
     st.error("Selected data panel (Ward or LSOA) could not be loaded. Please check data availability.")
     st.stop()
 
-months = panel["Month"].sort_values().unique()
 def format_m(dt):
     return dt.strftime("%b %Y")
-sel_month = st.sidebar.selectbox("Select month", months, format_func=format_m)
 
-vis_mode = st.sidebar.radio("Show", ["Actual", "Forecast (seasonal naïve)"])
+if view_mode == "Historical Data":
+    sel_month = st.sidebar.selectbox("Select month", historical_months, format_func=format_m)
+else:
+    sel_month = forecast_month  # For forecast mode, we only have one month
 
 # Handle the session state for the checkbox
 if "show_individual_burglaries" not in st.session_state:
     st.session_state.show_individual_burglaries = False
 
-# If switching to forecast mode, automatically uncheck the box
-if vis_mode.startswith("Forecast"):
-    st.session_state.show_individual_burglaries = False
-    
-# Disable checkbox if forecast is selected
-disabled_individual_locations = vis_mode.startswith("Forecast")
-show_individual_burglaries = st.sidebar.checkbox(
-    "Show individual burglary locations",
-    value=st.session_state.show_individual_burglaries,
-    disabled=disabled_individual_locations,
-    key="show_individual_burglaries"
-)
+# Disable individual burglary locations for forecasts
+show_individual_burglaries = False
+if view_mode == "Historical Data":
+    show_individual_burglaries = st.sidebar.checkbox(
+        "Show individual burglary locations",
+        value=st.session_state.show_individual_burglaries,
+        key="show_individual_burglaries"
+    )
 
 # ── prepare data ------------------------------------------------------------
-if vis_mode.startswith("Forecast"):
-    target_month = pd.Period(sel_month, freq="M").to_timestamp()
-    hist_month   = target_month - pd.offsets.DateOffset(years=1)
-    df_show = panel[panel["Month"] == hist_month].copy()
-    df_show["Month"] = target_month
+if view_mode == "Next Month Forecast":
+    # Use XGBoost predictions for next month
+    df_show = xgboost_pred.copy()
+    # Create the mapping for later use in both directions
+    ward_id_mapping = geo.set_index(name_col)[id_col].to_dict()
+    ward_name_mapping = geo.set_index(id_col)[name_col].to_dict()
+    df_show[id_col] = df_show["Ward"].map(ward_id_mapping)
+    df_show[name_col] = df_show["Ward"]  # Keep the ward name for later use
+    df_show["burglaries"] = df_show["Predicted_Burglaries"]
 else:
     df_show = panel[panel["Month"] == sel_month].copy()
 
@@ -190,7 +216,9 @@ chor['fill_color'] = chor['fill_color'].apply(lambda rgb: [int(c * 255) for c in
 
 # ── main layout -------------------------------------------------------------
 st.title("Residential Burglary in London")
-subtitle = f"{vis_mode}: {format_m(sel_month)}"
+subtitle = f"{sel_month.strftime('%B %Y')}"
+if view_mode == "Next Month Forecast":
+    subtitle += " (Next Month Prediction)"
 st.markdown(f"## {subtitle}")
 
 # pydeck map
@@ -317,4 +345,16 @@ with st.expander(table_title):
         use_container_width=True
     )
 
-st.caption("Seasonal naïve forecast = same month, previous year.")
+if view_mode == "Next Month Forecast":
+    st.caption("XGBoost predictions are based on historical patterns, ward characteristics, and socioeconomic factors.")
+    
+    # Add comparison with previous month
+    with st.expander("Previous Month Comparison"):
+        compare_df = df_show[["Ward", "Predicted_Burglaries", "Previous_Month_Actual"]].copy()
+        compare_df.columns = ["Ward", "Predicted Burglaries", "Previous Month Actual"]
+        compare_df["Change"] = compare_df["Predicted Burglaries"] - compare_df["Previous Month Actual"]
+        compare_df["Change %"] = (compare_df["Change"] / compare_df["Previous Month Actual"] * 100).round(1)
+        compare_df = compare_df.sort_values("Predicted Burglaries", ascending=False)
+        st.dataframe(compare_df, use_container_width=True)
+
+# Remove seasonal naive forecast caption since we now use XGBoost only
