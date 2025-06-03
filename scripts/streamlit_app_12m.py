@@ -37,7 +37,7 @@ LSOA_PANEL_FP = DATA / "lsoa_month_burglary.parquet"
 WARD_GEO_JSON = LOOK / "wards_2024.geojson"
 LSOA_GEO_JSON = LOOK / "LSOA21_Boundaries.geojson"  # Corrected filename
 LOOKUP_CSV = LOOK / "LSOA21_WD24_Lookup.csv"
-XGBOOST_PRED_CSV = PRED / "ward_burglary_predictions.csv"
+XGBOOST_PRED_CSV = PRED / "ward_burglary_predictions_12m.csv"  # Updated to 12-month predictions
 
 # Configure Streamlit page settings
 st.set_page_config(layout="wide")
@@ -99,11 +99,9 @@ def load_lsoa_geo() -> gpd.GeoDataFrame | None:
 
 @st.cache_data
 def load_xgboost_predictions() -> pd.DataFrame:
-    """Load XGBoost predictions for next month."""
-    df = pd.read_csv(XGBOOST_PRED_CSV)
-    # Since this is next month prediction, we'll create the date for the next month
-    next_month = pd.Timestamp.now() + pd.DateOffset(months=1)
-    df['Month'] = next_month.replace(day=1)  # First day of next month
+    """Load XGBoost predictions for next 12 months."""
+    df = pd.read_csv(XGBOOST_PRED_CSV, parse_dates=['Month'], infer_datetime_format=True)
+    df["Predicted_Burglaries"] = pd.to_numeric(df["Predicted_Burglaries"], errors="coerce").fillna(0)
     return df
 
 # Load data
@@ -115,17 +113,30 @@ xgboost_pred = load_xgboost_predictions()
 
 # Get available months for both historical and next month forecast
 historical_months = ward_panel["Month"].sort_values().unique()
-forecast_month = xgboost_pred["Month"].iloc[0]  # Just one month for forecast
+forecast_month = xgboost_pred["Month"].min()  # Use earliest forecast month
 
 # ── sidebar controls --------------------------------------------------------
 st.sidebar.title("London Burglary Dashboard")
 
-# Force Ward level when in forecast mode
+# Analysis mode selection
 view_mode = st.sidebar.radio("Type of Analysis",
-    options=["Historical Data", "Next Month Forecast"],
-    help="Historical Data shows actual burglary counts. Next Month Forecast shows predicted burglaries for next month using XGBoost model."
+    options=["Historical Data", "Future Forecast"],
+    help="Historical Data shows actual burglary counts. Future Forecast shows predicted burglaries for upcoming months using XGBoost model."
 )
 
+# Add forecast month selector if in forecast mode
+selected_forecast_date = None
+if view_mode == "Future Forecast":
+    # Use forecast dates directly from the predictions CSV rather than computed dates
+    forecast_dates = sorted(xgboost_pred["Month"].unique())
+    selected_forecast_date = st.sidebar.selectbox(
+        "Select forecast month",
+        options=forecast_dates,
+        format_func=lambda x: x.strftime("%B %Y"),
+        help="Select which month's forecast you want to view"
+    )
+    months_ahead = (selected_forecast_date.year - historical_months.max().year) * 12 + (selected_forecast_date.month - historical_months.max().month)
+    
 view_level = "Ward Level"
 if view_mode == "Historical Data":
     view_level = st.sidebar.radio("View Level", 
@@ -159,15 +170,25 @@ else:
 # No longer showing individual burglary locations
 
 # ── prepare data ------------------------------------------------------------
-if view_mode == "Next Month Forecast":
-    # Use XGBoost predictions for next month
-    df_show = xgboost_pred.copy()
+if view_mode == "Future Forecast":
+    # Load and filter XGBoost predictions for selected month
+    df_show = xgboost_pred[xgboost_pred['Month'] == selected_forecast_date].copy()
+    
     # Create the mapping for later use in both directions
     ward_id_mapping = geo.set_index(name_col)[id_col].to_dict()
     ward_name_mapping = geo.set_index(id_col)[name_col].to_dict()
+    
+    # Map ward IDs and names
     df_show[id_col] = df_show["Ward"].map(ward_id_mapping)
     df_show[name_col] = df_show["Ward"]  # Keep the ward name for later use
     df_show["burglaries"] = df_show["Predicted_Burglaries"]
+    
+    # Add confidence intervals if available
+    if "Lower_CI" in df_show.columns and "Upper_CI" in df_show.columns:
+        df_show["prediction_range"] = df_show.apply(
+            lambda x: f"{x['Predicted_Burglaries']:.0f} ({x['Lower_CI']:.0f}-{x['Upper_CI']:.0f})",
+            axis=1
+        )
 else:
     df_show = panel[panel["Month"] == sel_month].copy()
 
@@ -183,10 +204,12 @@ chor['fill_color'] = chor['burglaries'].apply(lambda x: colormap(norm(x))[:3])
 chor['fill_color'] = chor['fill_color'].apply(lambda rgb: [int(c * 255) for c in rgb] + [0.75*255])
 
 # ── main layout -------------------------------------------------------------
+# Update title and subtitle
 st.title("Residential Burglary in London")
-subtitle = f"{sel_month.strftime('%B %Y')}"
-if view_mode == "Next Month Forecast":
-    subtitle += " (Next Month Prediction)"
+if view_mode == "Future Forecast":
+    subtitle = f"Forecast for {selected_forecast_date.strftime('%B %Y')}"
+else:
+    subtitle = f"{sel_month.strftime('%B %Y')}"
 st.markdown(f"## {subtitle}")
 
 # Calculate center coordinates of London
@@ -282,34 +305,120 @@ else:
 st.markdown(f"{area_type_display} with Minimum Burglaries ({min_burglaries_value}): {min_area_names}")
 st.markdown(f"{area_type_display} with Maximum Burglaries ({max_burglaries_value}): {max_area_names}")
 
-# data table with search
-table_title = "Ward table" if view_level == "Ward Level" else "LSOA table"
-with st.expander(table_title):
-    search_label = "Search by Ward name or code" if view_level == "Ward Level" else "Search by LSOA name or code"
-    search = st.text_input(search_label, "")
-    df_table = chor[[id_col, name_col, "burglaries"]].copy()
-    df_table.columns = ["Code", "Name", "Burglaries"]
-    
-    if search:
-        mask = (df_table["Name"].str.contains(search, case=False) | 
-                df_table["Code"].str.contains(search, case=False))
-        df_table = df_table[mask]
-    
-    st.dataframe(
-        df_table.sort_values("Burglaries", ascending=False),
-        use_container_width=True
-    )
+# Unified table expander for Future Forecast mode
+if view_mode == "Future Forecast":
+    with st.expander("Ward Forecasts"):
+        search = st.text_input("Search by Ward name or code", "")
+        # Prepare combined forecast table using df_show
+        combined_df = df_show[[id_col, name_col, "Predicted_Burglaries"]].copy()
+        if "Lower_CI" in df_show.columns and "Upper_CI" in df_show.columns:
+            combined_df["Confidence Range"] = df_show["prediction_range"]
+        combined_df.columns = ["Code", "Name", "Predicted Burglaries", "Confidence Range"]
+        if search:
+            mask = (combined_df["Name"].str.contains(search, case=False)) | (combined_df["Code"].str.contains(search, case=False))
+            combined_df = combined_df[mask]
+        st.dataframe(combined_df.sort_values("Predicted Burglaries", ascending=False), use_container_width=True)
+else:
+    # For Historical Data mode, keep existing ward table
+    table_title = "Ward table" if view_level == "Ward Level" else "LSOA table"
+    with st.expander(table_title):
+        search_label = "Search by Ward name or code" if view_level == "Ward Level" else "Search by LSOA name or code"
+        search = st.text_input(search_label, "")
+        df_table = chor[[id_col, name_col, "burglaries"]].copy()
+        df_table.columns = ["Code", "Name", "Burglaries"]
+        if search:
+            mask = (df_table["Name"].str.contains(search, case=False)) | (df_table["Code"].str.contains(search, case=False))
+            df_table = df_table[mask]
+        st.dataframe(df_table.sort_values("Burglaries", ascending=False), use_container_width=True)
 
-if view_mode == "Next Month Forecast":
-    st.caption("XGBoost predictions are based on historical patterns, ward characteristics, and socioeconomic factors.")
+# Display additional information for forecasts
+if view_mode == "Future Forecast":
+    st.caption("XGBoost predictions based on historical patterns, ward characteristics, and socioeconomic factors.")
     
-    # Add comparison with previous month
-    with st.expander("Previous Month Comparison"):
-        compare_df = df_show[["Ward", "Predicted_Burglaries", "Previous_Month_Actual"]].copy()
-        compare_df.columns = ["Ward", "Predicted Burglaries", "Previous Month Actual"]
-        compare_df["Change"] = compare_df["Predicted Burglaries"] - compare_df["Previous Month Actual"]
-        compare_df["Change %"] = (compare_df["Change"] / compare_df["Previous Month Actual"] * 100).round(1)
-        compare_df = compare_df.sort_values("Predicted Burglaries", ascending=False)
-        st.dataframe(compare_df, use_container_width=True)
+    # Removed separate Forecast Details expander, details are now in the unified table expander
 
-# Remove seasonal naive forecast caption since we now use XGBoost only
+# Add new plots only in Future Forecast mode
+if view_mode == "Future Forecast":
+    with st.expander("Forecast Comparison Plots"):
+        # Add ward filter option
+        available_wards = sorted(df_show["Ward"].unique())
+        selected_ward_filter = st.selectbox("Select Ward for Plot", options=available_wards, index=0)
+        
+        import altair as alt
+        
+        st.markdown("#### Historical vs Forecast for " + selected_ward_filter)
+        hist_data = panel[(panel["WD24NM"] == selected_ward_filter) &
+                          (panel["Month"].dt.month == selected_forecast_date.month)].copy()
+        if hist_data.empty:
+            st.write("No historical data available for the selected ward and month.")
+        else:
+            # Format month & year for x-axis
+            hist_data["Year_Month"] = hist_data["Month"].dt.strftime("%b %Y")
+            # Historical line chart with calculated field set to "Historical Trend"
+            hist_chart = alt.Chart(hist_data).mark_line(point=True).transform_calculate(
+                Type="'Historical Trend'"
+            ).encode(
+                x=alt.X("Year_Month:O", title="Month and Year", axis=alt.Axis(labelAngle=0)),
+                y=alt.Y("burglaries:Q", title="Burglaries"),
+                color=alt.Color("Type:N", scale=alt.Scale(
+                    domain=["Historical Trend", "Forecast Trend"],
+                    range=["#ADD8E6", "#FF4B4B"]
+                ), legend=alt.Legend(title="Trend"))
+            ).properties(
+                title=f"Historical Burglaries for {selected_ward_filter} in {selected_forecast_date.strftime('%B')} over the Years",
+                height=400
+            )
+            
+            # Forecast point remains (without legend)
+            forecast_subset = df_show[df_show["Ward"] == selected_ward_filter]
+            if forecast_subset.empty:
+                st.write("No forecast data available for the selected ward.")
+            else:
+                forecast_value = forecast_subset["Predicted_Burglaries"].iloc[0]
+                forecast_month_str = selected_forecast_date.strftime("%b %Y")
+                forecast_df = pd.DataFrame({"Year_Month": [forecast_month_str], "Forecast": [forecast_value]})
+                forecast_point = alt.Chart(forecast_df).mark_point(color="#FF4B4B", size=100).encode(
+                    x=alt.X("Year_Month:O", title="Month and Year", axis=alt.Axis(labelAngle=0)),
+                    y=alt.Y("Forecast:Q", title="Burglaries")
+                )
+                
+                # Connecting dashed line with calculated field set to "Forecast Trend"
+                last_hist_value = hist_data.sort_values("Month")["burglaries"].iloc[-1]
+                last_hist_label = hist_data.sort_values("Month")["Year_Month"].iloc[-1]
+                connect_df = pd.DataFrame({
+                    "Year_Month": [last_hist_label, forecast_month_str],
+                    "Burglaries": [last_hist_value, forecast_value]
+                })
+                connect_line = alt.Chart(connect_df).mark_line(strokeDash=[5,3]).transform_calculate(
+                    Type="'Forecast Trend'"
+                ).encode(
+                    x=alt.X("Year_Month:O", title="Month and Year", axis=alt.Axis(labelAngle=0)),
+                    y=alt.Y("Burglaries:Q", title="Burglaries"),
+                    color=alt.Color("Type:N", scale=alt.Scale(
+                        domain=["Historical Trend", "Forecast Trend"],
+                        range=["#ADD8E6", "#FF4B4B"]
+                    ), legend=alt.Legend(title="Trend"))
+                )
+                
+                combined_chart = hist_chart + forecast_point + connect_line
+                st.altair_chart(combined_chart, use_container_width=True)
+
+        st.markdown(" ")        
+        st.markdown("#### Forecast Trend over Next 12 Months")
+        # Build trend chart with dashed red line for predicted trend and simple legend showing "Forecast Trend"
+        trend_data = xgboost_pred[xgboost_pred["Ward"] == selected_ward_filter].copy()
+        if trend_data.empty:
+            st.write("No forecast trend data available for the selected ward.")
+        else:
+            trend_data.sort_values("Month", inplace=True)
+            trend_chart = alt.Chart(trend_data).mark_line(point=True, strokeDash=[5,3]).transform_calculate(
+                Type="'Forecast Trend'"
+            ).encode(
+                x=alt.X("Month:T", axis=alt.Axis(format="%b %Y", title="Month and Year", labelAngle=0, tickCount=12)),
+                y=alt.Y("Predicted_Burglaries:Q", title="Predicted Burglaries"),
+                color=alt.Color("Type:N", scale=alt.Scale(domain=["Forecast Trend"], range=["#FF4B4B"]), legend=alt.Legend(title="Trend"))
+            ).properties(
+                title="Forecast Trend over Next 12 Months for " + selected_ward_filter,
+                height=400
+            )
+            st.altair_chart(trend_chart, use_container_width=True)

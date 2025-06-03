@@ -313,7 +313,7 @@ def main():
     print(predictions.head(10))
     
     # Save predictions to CSV
-    output_path = "./predictions/ward_burglary_predictions_next_month.csv"
+    output_path = "./predictions/ward_burglary_predictions.csv"
     print(f"\nSaving predictions to {output_path}...")
     predictions.to_csv(output_path, index=False)
     print("Predictions saved successfully!")
