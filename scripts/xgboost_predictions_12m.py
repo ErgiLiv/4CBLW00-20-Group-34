@@ -117,6 +117,9 @@ def prepare_features(df: pd.DataFrame) -> Tuple[pd.DataFrame, list]:
     """Prepare features for modeling."""
     df = df.copy()
     df['Month'] = pd.to_datetime(df['Month'])
+
+    # Ensure records are chronologically sorted per ward
+    df = df.sort_values(['WD24CD', 'Month'])
     
     # Load and merge socioeconomic data
     ward_pop = load_ward_population(LOOKUPS / "ward_pop2022.csv")
