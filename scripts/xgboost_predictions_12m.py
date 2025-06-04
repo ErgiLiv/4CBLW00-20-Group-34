@@ -19,6 +19,7 @@ from sklearn.preprocessing import StandardScaler
 from typing import Tuple
 from tqdm.auto import tqdm
 import warnings
+import matplotlib.pyplot as plt
 warnings.filterwarnings('ignore')
 
 # Paths setup
@@ -223,7 +224,29 @@ def train_model(df: pd.DataFrame, feature_cols: list) -> Tuple[xgb.XGBRegressor,
     print(f"R² Difference (Train - Test): {train_r2 - r2:.3f}")
 
     
-    # Feature Importance
+    # --- Residual Analysis and Prediction Error Distribution ---
+    residuals = y_test - y_pred
+    plt.figure(figsize=(10,4))
+    plt.subplot(1,2,1)
+    plt.scatter(y_pred, residuals, alpha=0.5)
+    plt.xlabel('Predicted Values')
+    plt.ylabel('Residuals')
+    plt.title('Residuals vs Predicted')
+    plt.axhline(0, color='red', linestyle='--')
+    
+    plt.subplot(1,2,2)
+    plt.hist(residuals, bins=20, edgecolor='k', alpha=0.7)
+    plt.xlabel('Residuals')
+    plt.title('Prediction Error Distribution')
+    plt.tight_layout()
+    
+    # Save the plot to the predictions folder
+    PREDICTIONS.mkdir(exist_ok=True)
+    plot_path = PREDICTIONS / "residuals_analysis.png"
+    plt.savefig(plot_path, dpi=300)
+    
+
+    # --- Feature Importance ---
     importance = pd.DataFrame({
         'feature': feature_cols,
         'importance': model.feature_importances_
