@@ -366,7 +366,7 @@ def predict_next_n_months_lsoa(df: pd.DataFrame, model: xgb.XGBRegressor,
             lsoa_data['Month'] = next_month
             lsoa_data = create_time_features(lsoa_data)
             pred_row = lsoa_data.iloc[-1:]
-            pred_row['LSOA'] = lsoa  # add LSOA identifier column
+            pred_row['LSOA'] = lsoa  #add LSOA identifier column
             pred_rows.append(pred_row)
         pred_df = pd.concat(pred_rows, ignore_index=True)
         X_pred = scaler.transform(pred_df[feature_cols])
