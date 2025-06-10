@@ -1,34 +1,15 @@
 """
 Ingest and process Metropolitan Police residential burglary data
+
+================================================================
+Run this file directly
 ================================================================
 
-Run this file **directly** (press ▶︎ in VS Code / PyCharm or `python -m scripts.ingest_burglary`).
-All paths have sensible defaults that match your repo layout – no CLI flags needed.
+Outputs:
+**ward_month_burglary.parquet** - ward/month table (fast Arrow format)
+**ward_month_burglary.geojson** - ward/month table with geometries
+**lsoa_month_burglary.parquet** - LSOA/month table (fast Arrow format)
 
-Repository structure assumed::
-
-    4CBLW00-20-Group-34/
-    ├── data/                        # raw monthly folders from police.uk
-    │   ├── 2013-12/                 # each contains *-street.csv OR .csv.zip
-    │   │   └── 2013-12-street.csv
-    │   └── …
-    ├── data_cache/
-    │   ├── lookups/                 # external reference tables & shapefiles
-    │   │   ├── LSOA21_WD24_Lookup.csv
-    │   │   └── wards_2024.geojson
-    │   └── processed/               # artefacts this pipeline writes
-    └── scripts/
-
-Outputs
--------
-* **ward_month_burglary.parquet** – ward/month table (fast Arrow format)
-* **ward_month_burglary.geojson** – ward/month table with geometries
-* **lsoa_month_burglary.parquet** – LSOA/month table (fast Arrow format)
-
-These live in *data_cache/processed/* and feed every later notebook.
-
-Author  : Group‑34 · TU/e Data Challenge 2
-Created : 2025‑05‑05
 """
 from __future__ import annotations
 
@@ -48,12 +29,12 @@ DEFAULT_LOOKUP_CSV = Path("data_cache/lookups/LSOA21_WD24_Lookup.csv")
 DEFAULT_GEOJSON = Path("data_cache/lookups/wards_2024.geojson")
 DEFAULT_OUT_DIR   = Path("data_cache/processed")
 
-RAW_GLOB      = "**/*-street.csv*"   # matches .csv or .zip
+RAW_GLOB      = "**/*-street.csv*"   #matches .csv
 POLICE_FORCE  = "Metropolitan Police Service"
 TARGET_CRIME  = "Burglary"
 DATE_COL      = "Month"
 
-# Normalise header variants that appear over years  -------------------------
+#normalise header variants that appear over years
 COL_RENAME = {
     "Crime type": "Crime type",
     "CrimeType": "Crime type",
@@ -101,20 +82,20 @@ def attach_ward(df: pd.DataFrame, lookup_csv: Path) -> pd.DataFrame:
     merged = df.merge(look, left_on="LSOA code", right_on="LSOA21CD", how="left")
     miss = merged["WD24CD"].isna().mean()
     if miss > 0:
-        print(f"ℹ️  {miss:.2%} rows lacked ward code and were discarded.")
+        print(f"  {miss:.2%} rows lacked ward code and were discarded.")
     return merged.dropna(subset=["WD24CD"])
 
 
 def aggregate(df: pd.DataFrame) -> pd.DataFrame:
-    """Return tidy ward‑month panel aggregating by code, then combining duplicate names."""
-    # First aggregate by code
+    """Return tidy ward-month panel aggregating by code, then combining duplicate names."""
+    #first aggregate by code
     base = (
         df.groupby([pd.Grouper(key=DATE_COL, freq="MS"), "WD24CD", "WD24NM"])
           .size()
           .rename("burglaries")
           .reset_index()
     )
-    # Then combine rows sharing the same ward name across different codes
+    #then combine rows sharing the same ward name across different codes
     agg_df = (
         base.groupby([DATE_COL, "WD24NM"])
             .agg(
@@ -132,14 +113,14 @@ def aggregate_lsoa(df: pd.DataFrame, lookup_csv: Path) -> pd.DataFrame:
     lsoa_lookup = pd.read_csv(lookup_csv, usecols=["LSOA21CD", "LSOA21NM"])
     merged_df = df.merge(lsoa_lookup, left_on="LSOA code", right_on="LSOA21CD", how="left")
     merged_df.dropna(subset=["LSOA21CD", "LSOA21NM", DATE_COL], inplace=True)
-    # First aggregate by LSOA code
+    #first aggregate by LSOA code
     base = (
         merged_df.groupby([pd.Grouper(key=DATE_COL, freq="MS"), "LSOA21CD", "LSOA21NM"])
           .size()
           .rename("burglaries")
           .reset_index()
     )
-    # Then combine rows sharing the same LSOA name across different codes
+    #then combine rows sharing the same LSOA name across different codes
     agg_df = (
         base.groupby([DATE_COL, "LSOA21NM"])
             .agg(
@@ -156,7 +137,7 @@ def attach_geometries(df: pd.DataFrame, geojson_path: Path) -> gpd.GeoDataFrame:
     """Attach ward geometries from GeoJSON file."""
     wards_gdf = gpd.read_file(geojson_path)
     
-    # Merge geometries with ward data
+    #merge geometries with ward data
     merged = df.merge(wards_gdf[["WD24CD", "geometry"]], on="WD24CD")
     return gpd.GeoDataFrame(merged, geometry="geometry", crs=wards_gdf.crs)
 
@@ -165,17 +146,17 @@ def save_outputs(ward_df: pd.DataFrame, ward_gdf: gpd.GeoDataFrame, lsoa_df: pd.
     """Save parquet and GeoJSON versions for wards, and parquet for LSOAs."""
     out_dir.mkdir(parents=True, exist_ok=True)
     
-    # Save ward parquet (numeric data only)
+    #save ward parquet (numeric data only)
     ward_pq = out_dir / "ward_month_burglary.parquet"
     ward_df.to_parquet(ward_pq, index=False)
     print(f"✅ Saved {len(ward_df):,} ward rows → {ward_pq}")
     
-    # Save ward GeoJSON (with geometries)
+    #save ward GeoJSON (with geometries)
     ward_geojson = out_dir / "ward_month_burglary.geojson"
     ward_gdf.to_file(ward_geojson, driver="GeoJSON")
     print(f"✅ Saved ward geometries → {ward_geojson}")
 
-    # Save LSOA parquet
+    #save LSOA parquet
     lsoa_pq = out_dir / "lsoa_month_burglary.parquet"
     lsoa_df.to_parquet(lsoa_pq, index=False)
     print(f"✅ Saved {len(lsoa_df):,} LSOA rows → {lsoa_pq}")
@@ -209,23 +190,23 @@ def main():
             "Download it and place it there, or pass --geojson."
         )
 
-    print("🔍 Ingesting raw burglary CSVs …")
+    print("Ingesting raw burglary CSVs …")
     crimes = ingest_raw(args.raw_dir)
     print(f"   {len(crimes):,} incidents loaded.")
 
-    print("🗺️  Mapping to wards …")
+    print("Mapping to wards …")
     with_w = attach_ward(crimes, args.lookup_csv)
 
-    print("📅 Aggregating …")
+    print("Aggregating …")
     panel_ward = aggregate(with_w)
     
-    print("📈 Aggregating by LSOA …")
+    print("Aggregating by LSOA …")
     panel_lsoa = aggregate_lsoa(crimes, args.lookup_csv)
     
-    print("🌍 Attaching ward geometries …")
+    print("Attaching ward geometries …")
     panel_ward_geo = attach_geometries(panel_ward, args.geojson)
 
-    print("💾 Writing outputs …")
+    print("Writing outputs …")
     save_outputs(panel_ward, panel_ward_geo, panel_lsoa, args.out_dir)
     print("Done ✓")
 

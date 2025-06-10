@@ -1,90 +1,146 @@
 # London Residential Burglary Analysis
-## TU/e Data Challenge 2 - Group 34
+## TU/e - Addressing real-world crime and security problems with data science (4CBLW00-20) - Group 34
 
-This repository contains a comprehensive analysis of residential burglary data in London, using data from the Metropolitan Police Service from 2010 to 2025.
+This repository contains a comprehensive analysis of residential burglary patterns across London wards and LSOAs, using data from the Metropolitan Police Service. The project focuses on processing and analyzing crime data to understand spatial and temporal patterns of residential burglaries.
+
+The aim of this project is to aid the Metropolitan Police combat burglaries by providing a prediction and visualization tool for burglaries and police force allocation in Greater London.
+
+## Project Overview
+Our analysis pipeline processes raw police data into ward-level and LSOA-level aggregations, enabling both broad-scale and granular analysis of burglary patterns across London. The project combines crime data with geographic boundaries to create detailed spatiotemporal visualizations and analysis.
+
+## Data Pipeline
+**Core Data Processing Pipeline** (`scripts/ingest_burglary.py`):
+- Ingests monthly CSV files manually downloaded from [data.police.uk](https://data.police.uk/data/).
+- Filters records for Metropolitan Police residential burglaries.
+- Maps crimes to current ward (2024) and LSOA (2021) boundaries.
+- Aggregates the data into monthly counts by area.
+- Generates three outputs:
+   - `lsoa_month_burglary.parquet`: Monthly burglary counts by LSOA.
+   - `ward_month_burglary.parquet`: Monthly burglary counts by ward.
+   - `ward_month_burglary.geojson`: Same data with ward geometries for mapping.
+
+###
+
+**XGBoost Machine Learning Analysis** (`scripts/xgboost_predictions_12m.py`):
+- Data Loading: Imports and prepares the monthly ward/LSOA burglary datasets.
+- Data Processing: Transforms data into a format suitable for model training and testing.
+- Model Training: Configures and trains an XGBoost model using the processed data.
+- Predictions and Evaluation: Generates predictions and evaluates model performance.
+- Generates four outputs:
+   - `residuals_analysis_Ward.png`: Residuals analysis plot for test Ward predictions.
+   - `ward_burglary_predictions_12m.csv`: Ward burglary prediction results (12 months).
+   - `residuals_analysis_LSOA.png`: Residuals analysis plot for test LSOA predictions.
+   - `lsoa_burglary_predictions_12m.csv`: LSOA burglary prediction results (12 months).
+###
+
+**Interactive Visualization** (`scripts/streamlit_app_12m.py`):
+- Launches a Streamlit web application to display interactive visualizations.
+- Presents monthly burglary counts and model predictions in dynamic charts and maps.
+- Presents police force resource allocation for each ward and LSOA based on the predictions.
 
 ## Project Structure
-
 ```
-├── data/                       # Raw data from police.uk (monthly folders)
-├── data_cache/                 # Processed data and lookups
-│   ├── lookups/               # Reference tables & shapefiles
-│   └── processed/             # Generated data artifacts
-├── notebooks/                  # Analysis notebooks
-│   ├── 02_eda.ipynb          # Exploratory Data Analysis
-│   ├── 03_baseline_models.ipynb   # Baseline forecasting models
-│   ├── 04_ml_models.ipynb        # Advanced ML models
-│   └── figures/               # Generated visualizations
-├── scripts/                    # Processing scripts
-│   ├── build_features.py      # Feature engineering
-│   ├── ingest_burglary.py     # Data ingestion pipeline
-│   └── streamlit_app.py       # Interactive dashboard
-└── requirements.txt           # Project dependencies
+├── data/                                # Contains raw police monthly data (December 2010 - February 2025)
+│   └── YYYY-MM/                            # Folder for each month's data
+│       └── YYYY-MM-metropolitan-street.csv    # Street-level crime data for Metropolitan Police for that month
+├── data_cache/                
+│   ├── lookups/                            # Required reference files
+│   │   ├── imd2019_lsoa.csv                   # Index of Multiple Deprivation 2019 dataset per LSOA
+│   │   ├── lsoa_pop2022.csv                   # LSOA 2022 population estimates
+│   │   ├── LSOA21_Boundaries.geojson          # LSOA 2021 geographic boundaries
+│   │   ├── LSOA21_WD24_Lookup.csv             # Mapping of LSOA 2021 to Ward 2024
+│   │   ├── ward_pop2022.csv                   # Ward 2022 population estimates
+│   │   └── wards_2024.geojson                 # Ward 2024 geographic boundaries
+│   └── processed/                          # Pipeline outputs
+│       ├── lsoa_month_burglary.parquet        # Monthly burglary counts by LSOA
+│       ├── ward_month_burglary.geojson        # Same data with ward geometries for mapping
+│       └── ward_month_burglary.parquet        # Monthly burglary counts by ward in tabular format
+├── notebooks/                 
+│   └── EDA.ipynb                           # Exploratory Data Analysis notebook
+├── predictions/
+│   ├── lsoa_burglary_predictions_12m.csv   # LSOA burglary prediction results (12 months)
+│   ├── residuals_analysis_LSOA.png         # Residuals analysis plot for test LSOA predictions
+│   ├── residuals_analysis_Ward.png         # Residuals analysis plot for test Ward predictions
+│   └── ward_burglary_predictions_12m.csv   # Ward burglary prediction results (12 months)
+├── scripts/                   
+│   ├── ingest_burglary.py                  # Data ingestion script for processing burglary records
+│   ├── streamlit_app_12m.py                 # Launches Streamlit web app for interactive visualizations
+│   └── xgboost_predictions_12m.py          # Executes XGBoost model to predict monthly burglary trends
+├── .gitattributes                       # Git attributes configuration
+├── .gitignore                           # Files and directories to be ignored by Git
+├── feature_columns.txt                  # List of feature columns used in modeling
+├── README.md                            # Project overview and documentation
+└── requirements.txt                     # Python dependencies for the project
 ```
 
-## Key Features
+## Setup & Usage
+1. **Prerequisites**:
+   - Python 3.11+
+   - Clone the repository
 
-1. **Data Processing Pipeline**: Automated ingestion and processing of Metropolitan Police burglary data
-2. **Exploratory Analysis**: Comprehensive EDA including:
-   - London-wide monthly burglary totals
-   - Top-20 wards by burglary incidents
-   - Interactive choropleth maps
-3. **Predictive Models**:
-   - Seasonal Naïve baseline
-   - SARIMA models
-   - Advanced ML models
-4. **Interactive Dashboard**: Streamlit-based visualization with:
-   - Month selector
-   - Interactive choropleth maps
-   - Ward/LSOA level analysis
-   - Actual vs Forecast comparison
-
-## Setup & Installation
-
-1. Clone the repository
-2. Install dependencies:
+2. **Install Dependencies**:
    ```bash
    pip install -r requirements.txt
    ```
 
-## Usage
+3. **Run the Pipeline**:
+   ```bash
+   python scripts/ingest_burglary.py   #Run time: ~3 minutes (depending on device performance)
+   ```
+   ```bash            
+   python scripts/xgboost_predictions_12m.py    #Run time: ~3 hours (depending on device performance)
+   ```
+   ```bash            
+   streamlit run scripts/streamlit_app_12m.py    #Loading time: ~30 seconds
+   ```
 
-### Data Processing
-Run the ingestion pipeline:
-```bash
-python scripts/ingest_burglary.py
-```
+## Data Requirements
+- **Raw Data**: Monthly crime data from [data.police.uk](https://data.police.uk/data/).
+  - Already in the repository: Raw data December 2010 - February 2025.
+  - If you want to add future data, follow these steps:
+      - Download street-level crime data for Metropolitan Police
+      - Place in `data/YYYY-MM/` folders
+      - Files should be named `YYYY-MM-metropolitan-street.csv`
 
-### Analysis Notebooks
-Navigate to the `notebooks/` directory and run Jupyter notebooks in sequence:
-1. `02_eda.ipynb` - Exploratory analysis
-2. `03_baseline_models.ipynb` - Baseline forecasting
-3. `04_ml_models.ipynb` - Advanced modeling
+- **Data lookups** (located in this repository in `data_cache/lookups`):
+   - Index of Multiple Deprivation 2019 dataset per LSOA (`imd2019_lsoa.csv`)
+   - LSOA 2022 population estimates (`lsoa_pop2022.csv`)
+   - LSOA 2021 geographic boundaries (`LSOA21_Boundaries.geojson`)
+   - Mapping of LSOA 2021 to Ward 2024 (`LSOA21_WD24_Lookup.csv`)
+   - Ward 2022 population estimates (`ward_pop2022.csv`)
+   - Ward 2024 geographic boundaries (`wards_2024.geojson`)
 
-### Interactive Dashboard
-Launch the Streamlit dashboard:
-```bash
-streamlit run scripts/streamlit_app.py
-```
+## Outputs
+- The pipeline generates three files in `data_cache/processed/`:
+   1. **ward_month_burglary.parquet**
+      - Monthly burglary counts by ward
+      - Fast tabular format for analysis
 
-## Data Sources
-- Primary data: [Metropolitan Police Service crime data](https://data.police.uk/)
-- Geographic data: London Ward and LSOA boundaries
+   2. **ward_month_burglary.geojson**
+      - Same data with ward geometries
+      - Suitable for mapping
 
-## Dependencies
-Key packages required:
-- pandas
-- geopandas
-- matplotlib
-- seaborn
-- streamlit
-- statsmodels
-- numpy
+   3. **lsoa_month_burglary.parquet**
+      - Monthly burglary counts by LSOA
+      - Enables granular analysis
 
-See `requirements.txt` for complete list.
+- Four files in `predictions/`:
+
+   1. **residuals_analysis_Ward.png**
+      - Residuals analysis plot for test Ward predictions
+   2. **ward_burglary_predictions_12m.csv**
+      - Ward burglary prediction results (12 months)
+   3. **residuals_analysis_LSOA.png**
+      - Residuals analysis plot for test LSOA predictions
+   4. **lsoa_burglary_predictions_12m.csv**
+      - LSOA burglary prediction results (12 months)
+
+- As well as a Streamlit web application to display interactive visualizations, showing:
+   - Monthly burglary counts and model predictions per ward and LSOA in dynamic charts and maps
+   - Police force resource allocation for each ward and LSOA based on the predictions
 
 ## Authors
-Group 34 - TU/e Data Challenge 2
+Group 34 - TU/e - Addressing real-world crime and security problems with data science (4CBLW00-20) course
 
 ## License
-This project is part of the TU/e Data Challenge 2 course and is intended for educational purposes.
+This project is part of the TU/e Addressing real-world crime and security problems with data science (4CBLW00-20) course and is intended for educational purposes.

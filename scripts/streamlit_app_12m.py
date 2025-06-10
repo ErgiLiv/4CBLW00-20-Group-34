@@ -1,8 +1,11 @@
-"""Streamlit dashboard prototype - London Residential Burglary
-==============================================================
+"""
+Streamlit dashboard prototype - London Residential Burglary
 
+================================================================
 Run locally:
     streamlit run scripts/streamlit_app_12m.py
+
+================================================================
 
 """
 from __future__ import annotations
@@ -23,11 +26,11 @@ CAPACITY_PER_ACTIVE_DAY = 200   # 100 officers × 2 h each (burglary window)
 OFFICER_SHIFT_HOURS     = 2.0   # length of the burglary-specific stint
 SPECIAL_OP_PERIOD       = 4     # months between extra deployments
 
-def weeks_in_month(ts: pd.Timestamp) -> float:          # NEW helper
+def weeks_in_month(ts: pd.Timestamp) -> float:          # new helper
     return calendar.monthrange(ts.year, ts.month)[1] / 7.0
 
 # ── data paths --------------------------------------------------------------
-ROOT = pathlib.Path(__file__).resolve().parent.parent  # Go up one level to project root
+ROOT = pathlib.Path(__file__).resolve().parent.parent  #go up one level to project root
 DATA = ROOT / "data_cache" / "processed"
 LOOK = ROOT / "data_cache" / "lookups"
 PRED = ROOT / "predictions"
@@ -35,11 +38,11 @@ PRED = ROOT / "predictions"
 WARD_PANEL_FP = DATA / "ward_month_burglary.parquet"
 LSOA_PANEL_FP = DATA / "lsoa_month_burglary.parquet"
 WARD_GEO_JSON = LOOK / "wards_2024.geojson"
-LSOA_GEO_JSON = LOOK / "LSOA21_Boundaries.geojson"  # Corrected filename
+LSOA_GEO_JSON = LOOK / "LSOA21_Boundaries.geojson"
 LOOKUP_CSV = LOOK / "LSOA21_WD24_Lookup.csv"
-XGBOOST_PRED_CSV = PRED / "ward_burglary_predictions_12m.csv"  # Updated to 12-month predictions
+XGBOOST_PRED_CSV = PRED / "ward_burglary_predictions_12m.csv"
 
-# Configure Streamlit page settings
+#configure Streamlit page settings
 st.set_page_config(layout="wide")
 
 # ── load --------------------------------------------------------------------
@@ -57,7 +60,7 @@ def load_lsoa_panel() -> pd.DataFrame | None:
 @st.cache_data
 def load_london_wards() -> set:
     lookup = pd.read_csv(LOOKUP_CSV)
-    # Filter for London borough codes (E09) but exclude City of London (E09000001)
+    #filter for London borough codes (E09) but exclude City of London (E09000001)
     london_wards = lookup[
         (lookup['LAD24CD'].str.startswith('E09', na=False)) & 
         (lookup['LAD24CD'] != 'E09000001')
@@ -67,7 +70,7 @@ def load_london_wards() -> set:
 @st.cache_data
 def load_london_lsoas() -> set | None:
     lookup = pd.read_csv(LOOKUP_CSV)
-    # Filter for London borough codes (E09) but exclude City of London (E09000001)
+    #filter for London borough codes (E09) but exclude City of London (E09000001)
     london_lsoas = lookup[
         (lookup['LAD24CD'].str.startswith('E09', na=False)) & 
         (lookup['LAD24CD'] != 'E09000001')
@@ -78,9 +81,9 @@ def load_london_lsoas() -> set | None:
 def load_ward_geo() -> gpd.GeoDataFrame:
     london_wards = load_london_wards()
     gdf = gpd.read_file(WARD_GEO_JSON)[["WD24CD", "WD24NM", "geometry"]]
-    # Filter for London wards
+    #filter for London wards
     gdf = gdf[gdf["WD24CD"].isin(london_wards)]
-    gdf = gdf.to_crs(4326)  # lat/lon for web mapping
+    gdf = gdf.to_crs(4326)  #lat/lon for web mapping
     return gdf
 
 @st.cache_resource
@@ -88,14 +91,12 @@ def load_lsoa_geo() -> gpd.GeoDataFrame | None:
     try:
         london_lsoas = load_london_lsoas()
         gdf = gpd.read_file(LSOA_GEO_JSON)[["LSOA21CD", "LSOA21NM", "geometry"]]
-        # Filter for London LSOAs
+        #filter for London LSOAs
         gdf = gdf[gdf["LSOA21CD"].isin(london_lsoas)]
-        gdf = gdf.to_crs(4326)  # lat/lon for web mapping
+        gdf = gdf.to_crs(4326)  #lat/lon for web mapping
         return gdf
     except FileNotFoundError:
         return None
-
-# Individual burglary locations feature removed for performance reasons
 
 @st.cache_data
 def load_xgboost_predictions() -> pd.DataFrame:
@@ -104,16 +105,16 @@ def load_xgboost_predictions() -> pd.DataFrame:
     df["Predicted_Burglaries"] = pd.to_numeric(df["Predicted_Burglaries"], errors="coerce").fillna(0)
     return df
 
-# Load data
+#load data
 ward_panel = load_ward_panel()
 lsoa_panel = load_lsoa_panel()
 ward_geo = load_ward_geo()
 lsoa_geo = load_lsoa_geo()
 xgboost_pred = load_xgboost_predictions()
 
-# Get available months for both historical and next month forecast
+#get available months for both historical and next month forecast
 historical_months = ward_panel["Month"].sort_values().unique()
-forecast_month = xgboost_pred["Month"].min()  # Use earliest forecast month
+forecast_month = xgboost_pred["Month"].min()  #use earliest forecast month
 
 # ── sidebar controls --------------------------------------------------------
 st.sidebar.title("London Burglary Dashboard")
@@ -124,24 +125,24 @@ view_mode = st.sidebar.radio("Type of Analysis",
     help="Historical Data shows actual burglary counts. Future Forecast shows predicted burglaries for upcoming months using XGBoost model."
 )
 
-# officers required per predicted burglary (default 2)
+#officers required per predicted burglary (default 2)
 off_per_burg = st.sidebar.slider(
     "Officers per burglary assumption", 1, 4, 2, 1
 )
 
-# NEW: Add forecast type selector when in Future Forecast mode
+#new: Add forecast type selector when in Future Forecast mode
 if view_mode == "Future Forecast":
 	forecast_type = st.sidebar.radio("Forecast Type",
 		options=["Ward Forecast", "LSOA Forecast"],
 		help="Select forecast type for Future Forecast mode"
 	)
 
-# Add forecast month selector if in forecast mode
+#add forecast month selector if in forecast mode
 selected_forecast_date = None
 if view_mode == "Future Forecast":
     forecast_dates = sorted(
 		(
-			# Use appropriate prediction dates based on forecast type.
+			#use appropriate prediction dates based on forecast type.
 			xgboost_pred["Month"].unique() 
 			if forecast_type == "Ward Forecast" 
 			else pd.read_csv(str(PRED / "lsoa_burglary_predictions_12m.csv"), parse_dates=['Month'])["Month"].unique()
@@ -160,7 +161,7 @@ if view_mode == "Historical Data":
         options=["Ward Level", "LSOA Level"],
         help="Ward Level shows data aggregated by electoral ward. LSOA (Lower Super Output Area) Level shows more detailed data at a smaller geographic level."
     )
-# In forecast mode, set view_level based on forecast type
+#in forecast mode, set view_level based on forecast type
 else:
     view_level = "Ward Level" if forecast_type == "Ward Forecast" else "LSOA Level"
 
@@ -168,13 +169,13 @@ if view_level == "LSOA Level" and (lsoa_panel is None or lsoa_geo is None):
     st.sidebar.error("LSOA level data is not available yet. Please use Ward Level view.")
     view_level = "Ward Level"
 
-# Use ward or LSOA data based on selection
+#use ward or LSOA data based on selection
 panel = ward_panel if view_level == "Ward Level" else lsoa_panel
 geo = ward_geo if view_level == "Ward Level" else lsoa_geo
 id_col = "WD24CD" if view_level == "Ward Level" else "LSOA21CD"
 name_col = "WD24NM" if view_level == "Ward Level" else "LSOA21NM"
 
-# Ensure panel is not None before proceeding
+#ensure panel is not None before proceeding
 if panel is None:
     st.error("Selected data panel (Ward or LSOA) could not be loaded. Please check data availability.")
     st.stop()
@@ -185,52 +186,52 @@ def format_m(dt):
 if view_mode == "Historical Data":
     sel_month = st.sidebar.selectbox("Select month", historical_months, format_func=format_m)
 else:
-    sel_month = forecast_month  # For forecast mode, we only have one month
+    sel_month = forecast_month  #for forecast mode, we only have one month
 
-# No longer showing individual burglary locations
+#no longer showing individual burglary locations
 
 # ── prepare data ------------------------------------------------------------
 if view_mode == "Future Forecast":
     if forecast_type == "Ward Forecast":
         df_show = xgboost_pred[xgboost_pred['Month'] == selected_forecast_date].copy()
         
-        # Create mapping for wards
+        #create mapping for wards
         ward_id_mapping = geo.set_index(name_col)[id_col].to_dict()
         ward_name_mapping = geo.set_index(id_col)[name_col].to_dict()
         
-        # Map ward IDs and names
+        #map ward IDs and names
         df_show[id_col] = df_show["Ward"].map(ward_id_mapping)
-        df_show[name_col] = df_show["Ward"]  # Keep the ward name for later use
+        df_show[name_col] = df_show["Ward"]  #keep the ward name for later use
         df_show["burglaries"] = df_show["Predicted_Burglaries"]
     else:
-        # LSOA Forecast: load LSOA predictions from file
+        #LSOA Forecast: load LSOA predictions from file
         lsoa_pred_fp = PRED / "lsoa_burglary_predictions_12m.csv"
         df_lsoa_pred = pd.read_csv(lsoa_pred_fp, parse_dates=['Month'])
         df_show = df_lsoa_pred[df_lsoa_pred['Month'] == selected_forecast_date].copy()
         # Rename column so that it matches the geo merge key
         df_show = df_show.rename(columns={"LSOA": "LSOA21CD"})
-        # Create mapping for LSOAs from geo file
+        #create mapping for LSOAs from geo file
         lsoa_name_mapping = geo.set_index("LSOA21CD")["LSOA21NM"].to_dict()
         df_show["LSOA21NM"] = df_show["LSOA21CD"].map(lsoa_name_mapping)
-        # Remove rows with missing LSOA names
+        #remove rows with missing LSOA names
         df_show = df_show[df_show["LSOA21NM"].notna()]
         df_show["burglaries"] = df_show["Predicted_Burglaries"]
 else:
     df_show = panel[panel["Month"] == sel_month].copy()
 
-# merge geometry and handle missing values
+#merge geometry and handle missing values
 chor = geo.merge(df_show[[id_col, "burglaries"]], left_on=id_col, right_on=id_col, how="left")
 chor.loc[:, "burglaries"] = chor["burglaries"].fillna(0)
 
-# Normalize burglary counts for colormap
+#normalize burglary counts for colormap
 norm = colors.Normalize(vmin=chor['burglaries'].min(), vmax=chor['burglaries'].max())
 colormap = plt.colormaps.get_cmap('Reds')  # Changed from cm.get_cmap
 chor['fill_color'] = chor['burglaries'].apply(lambda x: colormap(norm(x))[:3])
-# Apply opacity: 0.75
+#apply opacity: 0.75
 chor['fill_color'] = chor['fill_color'].apply(lambda rgb: [int(c * 255) for c in rgb] + [0.75*255])
 
 # ── main layout -------------------------------------------------------------
-# Update title and subtitle
+#update title and subtitle
 st.title("Residential Burglary in London")
 if view_mode == "Future Forecast":
     subtitle = f"Forecast for {selected_forecast_date.strftime('%B %Y')}"
@@ -238,19 +239,19 @@ else:
     subtitle = f"{sel_month.strftime('%B %Y')}"
 st.markdown(f"## {subtitle}")
 
-# Calculate center coordinates of London
-bounds = chor.total_bounds  # returns (minx, miny, maxx, maxy)
+#calculate center coordinates of London
+bounds = chor.total_bounds  #returns (min x, min y, max x , max y)
 mid_lon = (bounds[0] + bounds[2]) / 2
 mid_lat = (bounds[1] + bounds[3]) / 2
 
-# Create Folium map - Dynamic sizing with dark mode
+#create Folium map - dynamic sizing with dark mode
 m = folium.Map(
     location=[mid_lat, mid_lon],
     zoom_start=10,
     tiles='cartodbpositron'
 )
 
-# Create colormap
+#create colormap
 min_value = chor['burglaries'].min()
 max_value = chor['burglaries'].max()
 colormap = cm.LinearColormap(
@@ -261,7 +262,7 @@ colormap = cm.LinearColormap(
 )
 colormap.add_to(m)
 
-# Add choropleth layer
+#add choropleth layer
 folium.GeoJson(
     chor.to_json(),
     name='Burglaries',
@@ -278,13 +279,13 @@ folium.GeoJson(
     )
 ).add_to(m)
 
-# Add layer control
+#add layer control
 folium.LayerControl().add_to(m)
 
-# Create a container for the map with dynamic sizing
+#create a container for the map with dynamic sizing
 map_container = st.container()
 with map_container:
-    # Custom CSS to make the map container responsive and full-width
+    #custom CSS to make the map container responsive and full-width
     st.markdown(
         """
         <style>
@@ -304,10 +305,10 @@ with map_container:
         unsafe_allow_html=True
     )
     
-    # Display map using st_folium with explicit height
+    #display map using st_folium with explicit height
     st_folium(m, width='100%', height=800)
 
-# Display wards with min and max burglary counts
+#display wards with min and max burglary counts
 min_burglaries_value = chor['burglaries'].min()
 max_burglaries_value = chor['burglaries'].max()
 
@@ -331,9 +332,8 @@ else:
 st.markdown(f"{area_type_display} with Minimum Burglaries ({min_burglaries_value}): {min_area_names}")
 st.markdown(f"{area_type_display} with Maximum Burglaries ({max_burglaries_value}): {max_area_names}")
 
-# Historical Data section: Replace expander for data table with inline display
+#historical data section: Replace expander for data table with inline display
 if view_mode == "Historical Data":
-    # Removed st.expander("Data Table") wrapper
     search = st.text_input(
         "Search by " + ("Ward name or code" if view_level == "Ward Level" else "LSOA name or code"),
         key="historical_search"
@@ -348,7 +348,6 @@ if view_mode == "Historical Data":
 # ── Display forecast table and plots -------------------------------------------------------------
 if view_mode == "Future Forecast":
     if forecast_type == "Ward Forecast":
-        # Removed st.expander("Ward Forecasts") wrapper
         search = st.text_input("Search by Ward name or code", "")
         combined_df = df_show[[id_col, name_col, "Predicted_Burglaries"]].copy()
         if "Lower_CI" in df_show.columns and "Upper_CI" in df_show.columns:
@@ -361,8 +360,7 @@ if view_mode == "Future Forecast":
             mask = (combined_df["Name"].str.contains(search, case=False)) | (combined_df["Code"].str.contains(search, case=False))
             combined_df = combined_df[mask]
         st.dataframe(combined_df.sort_values("Predicted Burglaries", ascending=False), use_container_width=True)
-    else:  # LSOA Forecast table
-        # Removed st.expander("LSOA Forecasts") wrapper
+    else:  #LSOA Forecast table
         search = st.text_input("Search by LSOA name or code", "")
         combined_df = df_show[["LSOA21CD", "LSOA21NM", "Predicted_Burglaries"]].copy()
         if "Lower_CI" in df_show.columns and "Upper_CI" in df_show.columns:
@@ -376,7 +374,6 @@ if view_mode == "Future Forecast":
             combined_df = combined_df[mask]
         st.dataframe(combined_df.sort_values("Predicted Burglaries", ascending=False), use_container_width=True)
         
-    # Removed st.expander("Forecast Comparison Plots") wrapper; plots always shown
     if forecast_type == "Ward Forecast":
         available_wards = sorted(df_show["Ward"].unique())
         selected_ward_filter = st.selectbox("Select Ward for Plot", options=available_wards, index=0)
@@ -451,7 +448,7 @@ if view_mode == "Future Forecast":
                 height=400
             )
             st.altair_chart(trend_chart, use_container_width=True)
-    else:  # LSOA Forecast plots
+    else:  #LSOA Forecast plots
         available_lsoas = sorted(df_show["LSOA21NM"].dropna().unique())
         selected_lsoa_filter = st.selectbox("Select LSOA for Plot", options=available_lsoas, index=0)
         
@@ -511,7 +508,7 @@ if view_mode == "Future Forecast":
         st.markdown("#### Forecast Trend over Next 12 Months")
         import altair as alt
         trend_data = pd.read_csv(str(PRED / "lsoa_burglary_predictions_12m.csv"), parse_dates=['Month'])
-        # Get the selected LSOA code based on the chosen LSOA name from the dropdown
+        #get the selected LSOA code based on the chosen LSOA name from the dropdown
         selected_lsoa_code = df_show.loc[df_show["LSOA21NM"] == selected_lsoa_filter, "LSOA21CD"].iloc[0]
         trend_data = trend_data[trend_data["LSOA"] == selected_lsoa_code].copy()
         if trend_data.empty:
@@ -532,7 +529,7 @@ if view_mode == "Future Forecast":
 
 if view_mode == "Future Forecast":
     show_alloc = st.sidebar.checkbox(
-        "🚓 Police-officer allocation", value=False,
+        "Police resource allocation", value=False,
         help="Toggle recommended officer assignments based on predicted "
              "burglary demand and capacity/stress scores."
     )
@@ -543,7 +540,7 @@ if show_alloc and view_mode == "Future Forecast":
 
     if forecast_type == "Ward Forecast":
 
-        st.markdown("### 🛡️ Officer allocation per ward (2-hour burglary window)")
+        st.markdown("### Officer allocation per ward (2-hour burglary window)")
 
         df_alloc = df_show.copy()
 
@@ -572,7 +569,7 @@ if show_alloc and view_mode == "Future Forecast":
             .sort_values("Stress", ascending=False)
         )
 
-        # NEW: Add search input for filtering by Ward code or name
+        #new: add search input for filtering by Ward code or name
         search_alloc = st.text_input("Search by Ward code or name", key="alloc_search")
         if search_alloc:
             alloc_tbl = alloc_tbl[
@@ -600,18 +597,18 @@ if show_alloc and view_mode == "Future Forecast":
         else:
             st.table(spec_tbl)
 
-        # Compute stress if not present (adds the missing column)
+        #compute stress if not present (adds the missing column)
         monthly_cap = weeks_in_month(selected_forecast_date) * CAPACITY_PER_ACTIVE_DAY
         df_alloc["stress"] = (
             df_alloc["Predicted_Burglaries"] * OFFICER_SHIFT_HOURS / monthly_cap
         )
 
-        # Officers needed for the 2-h stint (cap at 100)
+        #officers needed for the 2-h stint (cap at 100)
         df_alloc["Officers needed"] = np.ceil(
             (df_alloc["Predicted_Burglaries"] * OFFICER_SHIFT_HOURS) / OFFICER_SHIFT_HOURS
         ).clip(0, 100).astype(int)
 
-        # Extra officers beyond the ward’s 100-officer pool
+        #extra officers beyond the ward’s 100-officer pool
         df_alloc["Extra (off >100)"] = np.maximum(
             np.ceil((df_alloc["Predicted_Burglaries"] * OFFICER_SHIFT_HOURS) /
                     OFFICER_SHIFT_HOURS) - 100, 0
@@ -624,8 +621,8 @@ if show_alloc and view_mode == "Future Forecast":
                      "stress": "Stress"}
         ).sort_values("Stress", ascending=False)
 
-        # Removed duplicate search table for officer allocation
-    else:  # LSOA Forecast
+        #removed duplicate search table for officer allocation
+    else:  #LSOA Forecast
 
         st.markdown("### 🛡️ Within-ward officer split across LSOAs")
 
@@ -635,7 +632,7 @@ if show_alloc and view_mode == "Future Forecast":
         wards_available = sorted(lsoa_w["WD24NM"].dropna().unique())
         sel_ward = st.selectbox("Ward to split its 100 officers", wards_available)
 
-        # Compute aggregated ward-level predictions to determine total predicted burglaries and required officers per ward
+        #compute aggregated ward-level predictions to determine total predicted burglaries and required officers per ward
         ward_alloc = lsoa_w.groupby("WD24NM").agg({"Predicted_Burglaries": "sum"}).reset_index()
         ward_alloc["Officers needed"] = np.minimum(100, np.ceil(ward_alloc["Predicted_Burglaries"] * off_per_burg)).astype(int)
         ward_need = int(ward_alloc.loc[ward_alloc["WD24NM"] == sel_ward, "Officers needed"].iloc[0])
@@ -645,7 +642,7 @@ if show_alloc and view_mode == "Future Forecast":
         if ward_need == 0 or total_burg == 0:
             st.info("No officers required for this ward.")
         else:
-            # proportional split of <ward_need> officers across LSOAs in the ward
+            #proportional split of <ward_need> officers across LSOAs in the ward
             ward_lsoas = lsoa_w[lsoa_w["WD24NM"] == sel_ward].copy()
             ward_lsoas["raw"]   = ward_lsoas["Predicted_Burglaries"] / total_burg * ward_need
             ward_lsoas["floor"] = np.floor(ward_lsoas["raw"]).astype(int)
@@ -662,7 +659,7 @@ if show_alloc and view_mode == "Future Forecast":
                          "floor": "Allocated officers"}
             )
 
-            # NEW: Add search input for filtering by LSOA Code or Name
+            #new: add search input for filtering by LSOA Code or Name
             search_alloc_lsoa = st.text_input("Search by LSOA code or name", key="lsoa_alloc_search")
             if search_alloc_lsoa:
                 lsoa_alloc_tbl = lsoa_alloc_tbl[
@@ -670,6 +667,4 @@ if show_alloc and view_mode == "Future Forecast":
                     lsoa_alloc_tbl["LSOA"].str.contains(search_alloc_lsoa, case=False)
                 ]
             st.dataframe(lsoa_alloc_tbl, use_container_width=True)
-# ────────────────────────────────────────────────────────────────────────────
-#  END OF ADDITIONS
-# ────────────────────────────────────────────────────────────────────────────
+            

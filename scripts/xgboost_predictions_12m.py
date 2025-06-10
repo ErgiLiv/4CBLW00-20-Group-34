@@ -1,6 +1,9 @@
 """
 XGBoost model for predicting ward-level and LSOA-level burglaries in London
-==========================================================================
+
+================================================================
+Run this file directly
+================================================================
 
 This script:
 1. Loads and preprocesses burglary data at ward and LSOA level
@@ -8,6 +11,7 @@ This script:
 3. Adds ward and LSOA population data
 4. Creates time-based and socioeconomic features
 5. Trains XGBoost model and predicts next 12 months
+
 """
 
 import pandas as pd
@@ -22,7 +26,7 @@ import warnings
 import matplotlib.pyplot as plt
 warnings.filterwarnings('ignore')
 
-# Paths setup
+#paths setup
 ROOT = Path(__file__).resolve().parent.parent
 DATA = ROOT / "data_cache"
 PROCESSED = DATA / "processed"
@@ -33,36 +37,36 @@ def create_time_features(df: pd.DataFrame) -> pd.DataFrame:
     """Create time-based features from the Month column."""
     df = df.copy()
     
-    # Basic time components
+    #basic time components
     df['year'] = df['Month'].dt.year
     df['month'] = df['Month'].dt.month
     df['quarter'] = df['Month'].dt.quarter
     
-    # Seasonal indicators
+    #seasonal indicators
     df['is_summer'] = df['month'].isin([6, 7, 8]).astype(int)
     df['is_winter'] = df['month'].isin([12, 1, 2]).astype(int)
     
-    # Lagged features (essential for multi-month forecasting)
+    #lagged features (essential for multi-month forecasting)
     for lag in [1, 2, 3, 6, 12]:
         df[f'burglaries_lag_{lag}'] = df.groupby('WD24CD')['burglaries'].shift(lag)
     
-    # Rolling statistics
+    #rolling statistics
     for window in [3, 6, 12]:
-        # Mean
+        #mean
         df[f'burglaries_rollmean_{window}'] = df.groupby('WD24CD')['burglaries'].transform(
             lambda x: x.rolling(window=window, min_periods=1).mean()
         )
-        # Standard deviation for uncertainty
+        #standard deviation for uncertainty
         df[f'burglaries_rollstd_{window}'] = df.groupby('WD24CD')['burglaries'].transform(
             lambda x: x.rolling(window=window, min_periods=1).std()
         )
     
-    # Trend indicators
+    #trend indicators
     df['trend_3m'] = df['burglaries_rollmean_3'] - df['burglaries_lag_3']
     df['trend_6m'] = df['burglaries_rollmean_6'] - df['burglaries_lag_6']
     df['trend_12m'] = df['burglaries_rollmean_12'] - df['burglaries_lag_12']
     
-    # Year-over-year change
+    #year-over-year change
     df['yoy_change'] = df['burglaries'] - df['burglaries_lag_12']
     
     return df
@@ -70,21 +74,21 @@ def create_time_features(df: pd.DataFrame) -> pd.DataFrame:
 def load_ward_population(ward_pop_file: Path) -> pd.DataFrame:
     """Load and aggregate ward population data."""
     pop_df = pd.read_csv(ward_pop_file)
-    # Sum population across age/sex groups for each ward
+    #sum population across age/sex groups for each ward
     ward_pop = pop_df.groupby('WD22CD').agg({
-        'population_2022': 'sum'  # Using 2022 population
+        'population_2022': 'sum'  #using 2022 population
     }).reset_index()
     ward_pop = ward_pop.rename(columns={
-        'WD22CD': 'WD24CD',  # Match with current ward codes
+        'WD22CD': 'WD24CD',  #match with current ward codes
         'population_2022': 'population'
     })
     return ward_pop
 
-# New function: load LSOA population data (assumes file lsoa_pop2022.csv exists)
+#new function: load LSOA population data (assumes file lsoa_pop2022.csv exists)
 def load_lsoa_population(lsoa_pop_file: Path) -> pd.DataFrame:
     pop_df = pd.read_csv(lsoa_pop_file)
     pop_df = pop_df.rename(columns={'LSOA 2021 Code': 'LSOA21CD', 'Total': 'population'})
-    # Remove commas from the 'population' column and convert to float
+    #remove commas from the 'population' column and convert to float
     pop_df['population'] = pop_df['population'].replace({',': ''}, regex=True).astype(float)
     return pop_df
 
@@ -95,7 +99,7 @@ def calculate_ward_imd(imd_file: Path, lookup_file: Path) -> pd.DataFrame:
     imd_df = pd.read_csv(imd_file)
     lookup_df = pd.read_csv(lookup_file)
     
-    # Merge IMD with lookup
+    #merge IMD with lookup
     merged = pd.merge(
         imd_df,
         lookup_df[['LSOA21CD', 'WD24CD', 'WD24NM']],
@@ -104,7 +108,7 @@ def calculate_ward_imd(imd_file: Path, lookup_file: Path) -> pd.DataFrame:
         how='inner'
     )
     
-    # Calculate ward-level metrics (mean of LSOA values)
+    #calculate ward-level metrics (mean of LSOA values)
     ward_imd = merged.groupby('WD24CD').agg({
         'Index of Multiple Deprivation (IMD) Score': 'mean',
         'Income Score (rate)': 'mean',
@@ -115,13 +119,13 @@ def calculate_ward_imd(imd_file: Path, lookup_file: Path) -> pd.DataFrame:
         'Living Environment Score': 'mean'
     }).reset_index()
     
-    # Rename columns for clarity
+    #rename columns for clarity
     ward_imd.columns = ['WD24CD', 'imd_score', 'income_score', 'employment_score', 
                        'crime_score', 'health_score', 'housing_score', 'environment_score']
     
     return ward_imd
 
-# New function: get LSOA-level IMD data (no aggregation)
+#new function: get LSOA-level IMD data (no aggregation)
 def get_lsoa_imd(imd_file: Path, lookup_file: Path) -> pd.DataFrame:
     imd_df = pd.read_csv(imd_file)
     lookup_df = pd.read_csv(lookup_file)[['LSOA21CD', 'WD24CD', 'WD24NM']]
@@ -132,7 +136,7 @@ def get_lsoa_imd(imd_file: Path, lookup_file: Path) -> pd.DataFrame:
         right_on='LSOA21CD',
         how='inner'
     )
-    # Rename columns for clarity – ensure all IMD columns reflect the CSV structure accurately
+    #rename columns for clarity
     merged = merged.rename(columns={
         'Index of Multiple Deprivation (IMD) Score': 'imd_score',
         'Income Score (rate)': 'income_score',
@@ -149,61 +153,61 @@ def prepare_features(df: pd.DataFrame) -> Tuple[pd.DataFrame, list]:
     df = df.copy()
     df['Month'] = pd.to_datetime(df['Month'])
 
-    # Ensure records are chronologically sorted per ward
+    #ensure records are chronologically sorted per ward
     df = df.sort_values(['WD24CD', 'Month'])
     
-    # Load and merge socioeconomic data
+    #load and merge socioeconomic data
     ward_pop = load_ward_population(LOOKUPS / "ward_pop2022.csv")
     ward_imd = calculate_ward_imd(LOOKUPS / "imd2019_lsoa.csv", LOOKUPS / "LSOA21_WD24_Lookup.csv")
     
-    # Merge population and IMD data
+    #merge population and IMD data
     df = pd.merge(df, ward_pop, on='WD24CD', how='left')
     df = pd.merge(df, ward_imd, on='WD24CD', how='left')
     
-    # Calculate rate-based features
+    #calculate rate-based features
     df['burglary_rate'] = (df['burglaries'] * 1000) / df['population']
     
-    # Create time features
+    #create time features
     df = create_time_features(df)
     
-    # List of features for modeling
+    #list of features for modeling
     feature_cols = [
-        # Time components
+        #time components
         'year', 'month', 'quarter', 'is_summer', 'is_winter',
         
-        # Lagged values (essential for multi-month forecasting)
+        #lagged values (essential for multi-month forecasting)
         'burglaries_lag_1', 'burglaries_lag_2', 'burglaries_lag_3',
         'burglaries_lag_6', 'burglaries_lag_12',
         
-        # Rolling statistics
+        #rolling statistics
         'burglaries_rollmean_3', 'burglaries_rollmean_6', 'burglaries_rollmean_12',
         'burglaries_rollstd_3', 'burglaries_rollstd_6', 'burglaries_rollstd_12',
         
-        # Trend indicators
+        #trend indicators
         'trend_3m', 'trend_6m', 'trend_12m', 'yoy_change',
         
-        # Socioeconomic indicators
+        #socioeconomic indicators
         'population', 'burglary_rate',
         'imd_score', 'income_score', 'employment_score',
         'crime_score', 'health_score', 'housing_score',
         'environment_score'
     ]
     
-    # Drop rows with NaN values (first year will have NaNs due to lags)
+    #drop rows with NaN values (first year will have NaNs due to lags)
     df = df.dropna(subset=feature_cols)
     
     return df, feature_cols
 
-# New function: Prepare features for LSOA-level modeling (expects input file with LSOA21CD)
+#new function: Prepare features for LSOA-level modeling (expects input file with LSOA21CD)
 def prepare_features_lsoa(df: pd.DataFrame) -> tuple:
     df = df.copy()
     df['Month'] = pd.to_datetime(df['Month'])
     df = df.sort_values(['LSOA21CD', 'Month'])
     
-    # Load and merge LSOA-specific socioeconomic data
+    #load and merge LSOA-specific socioeconomic data
     lsoa_pop = load_lsoa_population(LOOKUPS / "lsoa_pop2022.csv")
     lsoa_imd = get_lsoa_imd(LOOKUPS / "imd2019_lsoa.csv", LOOKUPS / "LSOA21_WD24_Lookup.csv")
-    # Merge on LSOA21CD
+    #merge on LSOA21CD
     df = pd.merge(df, lsoa_pop, on='LSOA21CD', how='left')
     df = pd.merge(df, lsoa_imd, on='LSOA21CD', how='left')
     
@@ -211,7 +215,7 @@ def prepare_features_lsoa(df: pd.DataFrame) -> tuple:
     df = create_time_features(df)
     
     feature_cols = [
-        # Time components, lags, rolling stats, trends, and socioeconomic features
+        #time components, lags, rolling stats, trends, and socioeconomic features
         'year', 'month', 'quarter', 'is_summer', 'is_winter',
         'burglaries_lag_1', 'burglaries_lag_2', 'burglaries_lag_3',
         'burglaries_lag_6', 'burglaries_lag_12',
@@ -229,19 +233,19 @@ def prepare_features_lsoa(df: pd.DataFrame) -> tuple:
 def train_model(df: pd.DataFrame, feature_cols: list) -> Tuple[xgb.XGBRegressor, StandardScaler]:
     """Train XGBoost model with carefully tuned parameters."""
     
-    # Split data keeping most recent data for testing
+    #split data keeping most recent data for testing
     train_date = df['Month'].max() - pd.DateOffset(months=12)
     train_df = df[df['Month'] <= train_date]
     test_df = df[df['Month'] > train_date]
     
-    # Prepare features
+    #prepare features
     scaler = StandardScaler()
     X_train = scaler.fit_transform(train_df[feature_cols])
     X_test = scaler.transform(test_df[feature_cols])
     y_train = train_df['burglaries']
     y_test = test_df['burglaries']
     
-    # Initialize model with carefully tuned parameters
+    #initialize model with tuned parameters
     model = xgb.XGBRegressor(
         n_estimators=200,
         learning_rate=0.05,
@@ -254,7 +258,7 @@ def train_model(df: pd.DataFrame, feature_cols: list) -> Tuple[xgb.XGBRegressor,
         early_stopping_rounds=20
     )
     
-    # Train model with evaluation set
+    #train model with evaluation set
     model.fit(
         X_train, y_train,
         eval_set=[(X_train, y_train), (X_test, y_test)],
@@ -306,7 +310,7 @@ def train_model(df: pd.DataFrame, feature_cols: list) -> Tuple[xgb.XGBRegressor,
     plt.title('Prediction Error Distribution')
     plt.tight_layout()
     
-    # Save the plot to the predictions folder
+    #save the plot to the predictions folder
     PREDICTIONS.mkdir(exist_ok=True)
     plot_path = PREDICTIONS / "residuals_analysis.png"
     plt.savefig(plot_path, dpi=300)
@@ -338,11 +342,10 @@ def train_model(df: pd.DataFrame, feature_cols: list) -> Tuple[xgb.XGBRegressor,
         }).round(2)
         print("\nWorst Performing Wards (by absolute error):")
         print(ward_errors.nlargest(5, 'abs_error').to_string())
-    # --- End Additional Statistics ---
     
     return model, scaler
 
-# New function: Recursive forecasting per LSOA
+#new function: Recursive forecasting per LSOA
 def predict_next_n_months_lsoa(df: pd.DataFrame, model: xgb.XGBRegressor, 
                                scaler: StandardScaler, feature_cols: list, 
                                n_months: int = 12) -> pd.DataFrame:
@@ -351,7 +354,7 @@ def predict_next_n_months_lsoa(df: pd.DataFrame, model: xgb.XGBRegressor,
     
     current_df = df.copy()
     unique_lsoas = df['LSOA21CD'].unique()
-    # For LSOA naming, we simply use the LSOA code (or augment with lookup if needed)
+    #for LSOA naming, we simply use the LSOA code (or augment with lookup if needed)
     print(f"\nGenerating LSOA-level predictions for {n_months} months across {len(unique_lsoas)} LSOAs...")
     
     for i in tqdm(range(1, n_months + 1), desc="Predicting months"):
@@ -359,7 +362,7 @@ def predict_next_n_months_lsoa(df: pd.DataFrame, model: xgb.XGBRegressor,
         pred_rows = []
         for lsoa in tqdm(unique_lsoas, desc=f"Processing LSOAs for {next_month.strftime('%B %Y')}", leave=False):
             lsoa_data = current_df[current_df['LSOA21CD'] == lsoa].copy()
-            # Update time features
+            #update time features
             lsoa_data['Month'] = next_month
             lsoa_data = create_time_features(lsoa_data)
             pred_row = lsoa_data.iloc[-1:]
@@ -369,7 +372,7 @@ def predict_next_n_months_lsoa(df: pd.DataFrame, model: xgb.XGBRegressor,
         X_pred = scaler.transform(pred_df[feature_cols])
         predictions = model.predict(X_pred)
         
-        # Enforce predictions within 2 std deviations of historical mean per LSOA
+        #enforce predictions within 2 std deviations of historical mean per LSOA
         last_year_same_month = latest_date - pd.DateOffset(months=12-i)
         historical_stats = df[df['Month'] == last_year_same_month].groupby('LSOA21CD')['burglaries'].agg(['mean', 'std'])
         for idx, lsoa in enumerate(unique_lsoas):
@@ -407,67 +410,67 @@ def predict_next_n_months(df: pd.DataFrame, model: xgb.XGBRegressor,
                          n_months: int = 12) -> pd.DataFrame:
     """Predict burglaries for next n months using recursive forecasting."""
     
-    # Start with the most recent data
+    #start with the most recent data
     latest_date = df['Month'].max()
     predictions_list = []
     
-    # Create a copy of the latest data to update iteratively
+    #create a copy of the latest data to update iteratively
     current_df = df.copy()
     
-    # Get unique wards once
+    #get unique wards once
     unique_wards = df['WD24CD'].unique()
     ward_names = df[['WD24CD', 'WD24NM']].drop_duplicates().set_index('WD24CD')['WD24NM']
     
     print(f"\nGenerating predictions for {n_months} months across {len(unique_wards)} wards...")
     
-    # Progress bar for months
+    #progress bar for months
     for i in tqdm(range(1, n_months + 1), desc="Predicting months"):
-        # Calculate next month
+        #calculate next month
         next_month = latest_date + pd.DateOffset(months=i)
         
-        # Create prediction data for each ward
+        #create prediction data for each ward
         pred_rows = []
-        # Progress bar for wards (nested, leave=False to keep it clean)
+        #progress bar for wards (nested, leave=False to keep it clean)
         for ward_code in tqdm(unique_wards, desc=f"Processing wards for {next_month.strftime('%B %Y')}", leave=False):
-            # Get ward's data
+            #get ward's data
             ward_data = current_df[current_df['WD24CD'] == ward_code].copy()
             ward_name = ward_names[ward_code]
             
-            # Update time features for next month
+            #update time features for next month
             ward_data['Month'] = next_month
             ward_data = create_time_features(ward_data)
             
-            # Select most recent row
+            #select most recent row
             pred_row = ward_data.iloc[-1:]
             
-            # Include ward identifier columns
+            #include ward identifier columns
             pred_row['Ward'] = ward_name
             pred_rows.append(pred_row)
         
-        # Combine all wards
+        #combine all wards
         pred_df = pd.concat(pred_rows, ignore_index=True)
         
-        # Make predictions
+        #make predictions
         X_pred = scaler.transform(pred_df[feature_cols])
         predictions = model.predict(X_pred)
         
-        # Ensure predictions stay within reasonable bounds
+        #ensure predictions stay within reasonable bounds
         last_year_same_month = latest_date - pd.DateOffset(months=12-i)
         historical_stats = df[df['Month'] == last_year_same_month].groupby('WD24CD')['burglaries'].agg(['mean', 'std'])
         
-        # For each ward, ensure prediction is within 2 standard deviations of historical mean
+        #for each ward, ensure prediction is within 2 standard deviations of historical mean
         for idx, ward_code in enumerate(unique_wards):
             if ward_code in historical_stats.index:
                 mean = historical_stats.loc[ward_code, 'mean']
-                std = max(1, historical_stats.loc[ward_code, 'std'])  # Minimum std of 1
+                std = max(1, historical_stats.loc[ward_code, 'std'])  #minimum std of 1
                 predictions[idx] = np.clip(predictions[idx], mean - 2*std, mean + 2*std)
         
-        # Calculate prediction intervals using historical variability
+        #calculate prediction intervals using historical variability
         pred_std = pred_df[['burglaries_rollstd_3', 'burglaries_rollstd_6', 'burglaries_rollstd_12']].mean(axis=1)
-        lower_ci = np.maximum(predictions - 1.96 * pred_std, 0)  # Ensure non-negative
-        upper_ci = np.minimum(predictions + 1.96 * pred_std, predictions * 2)  # Cap at double the prediction
+        lower_ci = np.maximum(predictions - 1.96 * pred_std, 0)  #ensure non-negative
+        upper_ci = np.minimum(predictions + 1.96 * pred_std, predictions * 2)  #cap at double the prediction
         
-        # Create results dataframe
+        #create results dataframe
         results = pd.DataFrame({
             'Ward': pred_df['Ward'],
             'Month': next_month,
@@ -479,7 +482,7 @@ def predict_next_n_months(df: pd.DataFrame, model: xgb.XGBRegressor,
         
         predictions_list.append(results)
         
-        # Update current_df with new predictions for next iteration
+        #update current_df with new predictions for next iteration
         for idx, ward_code in enumerate(unique_wards):
             mask = current_df['WD24CD'] == ward_code
             new_row = current_df[mask].iloc[-1:].copy()
@@ -487,7 +490,7 @@ def predict_next_n_months(df: pd.DataFrame, model: xgb.XGBRegressor,
             new_row['burglaries'] = predictions[idx]
             current_df = pd.concat([current_df, new_row], ignore_index=True)
     
-    # Combine all months
+    #combine all months
     final_predictions = pd.concat(predictions_list, ignore_index=True)
     return final_predictions.sort_values(['Month', 'Ward'])
 
