@@ -11,3 +11,4 @@ streamlit
 statsmodels
 xgboost
 scikit-learn
+streamlit-folium
