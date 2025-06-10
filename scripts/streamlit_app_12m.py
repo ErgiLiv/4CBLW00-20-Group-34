@@ -6,7 +6,7 @@ Run locally:
 
 """
 from __future__ import annotations
-import pathlib
+import pathlib, math, calendar
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -17,6 +17,14 @@ import branca.colormap as cm
 import matplotlib.colors as colors
 import matplotlib.pyplot as plt
 from streamlit_folium import st_folium
+
+# ── policing-resource constants ─────────────────────────────────────────────
+CAPACITY_PER_ACTIVE_DAY = 200   # 100 officers × 2 h each (burglary window)
+OFFICER_SHIFT_HOURS     = 2.0   # length of the burglary-specific stint
+SPECIAL_OP_PERIOD       = 4     # months between extra deployments
+
+def weeks_in_month(ts: pd.Timestamp) -> float:          # NEW helper
+    return calendar.monthrange(ts.year, ts.month)[1] / 7.0
 
 # ── data paths --------------------------------------------------------------
 ROOT = pathlib.Path(__file__).resolve().parent.parent  # Go up one level to project root
@@ -114,6 +122,11 @@ st.sidebar.title("London Burglary Dashboard")
 view_mode = st.sidebar.radio("Type of Analysis",
     options=["Historical Data", "Future Forecast"],
     help="Historical Data shows actual burglary counts. Future Forecast shows predicted burglaries for upcoming months using XGBoost model."
+)
+
+# officers required per predicted burglary (default 2)
+off_per_burg = st.sidebar.slider(
+    "Officers per burglary assumption", 1, 4, 2, 1
 )
 
 # NEW: Add forecast type selector when in Future Forecast mode
@@ -516,3 +529,147 @@ if view_mode == "Future Forecast":
                 height=400
             )
             st.altair_chart(trend_chart, use_container_width=True)
+
+if view_mode == "Future Forecast":
+    show_alloc = st.sidebar.checkbox(
+        "🚓 Police-officer allocation", value=False,
+        help="Toggle recommended officer assignments based on predicted "
+             "burglary demand and capacity/stress scores."
+    )
+else:
+    show_alloc = False
+
+if show_alloc and view_mode == "Future Forecast":
+
+    if forecast_type == "Ward Forecast":
+
+        st.markdown("### 🛡️ Officer allocation per ward (2-hour burglary window)")
+
+        df_alloc = df_show.copy()
+
+        # 2a  officers needed (cap 100) and “extra” beyond 100
+        df_alloc["Officers needed"] = np.minimum(
+            100,
+            np.ceil(df_alloc["Predicted_Burglaries"] * off_per_burg)
+        ).astype(int)
+
+        df_alloc["Extra needed"] = np.maximum(
+            np.ceil(df_alloc["Predicted_Burglaries"] * off_per_burg) - 100,
+            0
+        ).astype(int)
+
+        # 2b  stress (needed ÷ 100-officer routine capacity)
+        df_alloc["stress"] = df_alloc["Officers needed"] / 100
+
+        alloc_tbl = (
+            df_alloc[[id_col, name_col,
+                      "Predicted_Burglaries", "stress",
+                      "Officers needed", "Extra needed"]]
+            .rename(columns={id_col: "Code",
+                             name_col: "Ward",
+                             "Predicted_Burglaries": "Pred burglaries",
+                             "stress": "Stress"})
+            .sort_values("Stress", ascending=False)
+        )
+
+        # NEW: Add search input for filtering by Ward code or name
+        search_alloc = st.text_input("Search by Ward code or name", key="alloc_search")
+        if search_alloc:
+            alloc_tbl = alloc_tbl[
+                alloc_tbl["Code"].str.contains(search_alloc, case=False) |
+                alloc_tbl["Ward"].str.contains(search_alloc, case=False)
+            ]
+        st.dataframe(alloc_tbl, use_container_width=True)
+
+        # ── Special-operation targets (once / 4 months) ────────────────────────────
+        next4 = pd.date_range(selected_forecast_date, periods=4, freq="MS")
+        future4 = xgboost_pred[xgboost_pred["Month"].isin(next4)].copy()
+        future4["needed"] = np.ceil(future4["Predicted_Burglaries"] * off_per_burg)
+        future4["extra"]  = np.maximum(future4["needed"] - 100, 0)
+
+        spec_tbl = (future4.groupby("Ward")["extra"]
+                            .sum().reset_index()
+                            .query("extra > 0")
+                            .sort_values("extra", ascending=False)
+                            .head(10)
+                            .rename(columns={"extra": "Total extra officers"}))
+
+        st.markdown("#### 📆 Suggested special-operation wards (next 4 months)")
+        if spec_tbl.empty:
+            st.write("No wards exceed routine capacity in the next four-month window.")
+        else:
+            st.table(spec_tbl)
+
+        # Compute stress if not present (adds the missing column)
+        monthly_cap = weeks_in_month(selected_forecast_date) * CAPACITY_PER_ACTIVE_DAY
+        df_alloc["stress"] = (
+            df_alloc["Predicted_Burglaries"] * OFFICER_SHIFT_HOURS / monthly_cap
+        )
+
+        # Officers needed for the 2-h stint (cap at 100)
+        df_alloc["Officers needed"] = np.ceil(
+            (df_alloc["Predicted_Burglaries"] * OFFICER_SHIFT_HOURS) / OFFICER_SHIFT_HOURS
+        ).clip(0, 100).astype(int)
+
+        # Extra officers beyond the ward’s 100-officer pool
+        df_alloc["Extra (off >100)"] = np.maximum(
+            np.ceil((df_alloc["Predicted_Burglaries"] * OFFICER_SHIFT_HOURS) /
+                    OFFICER_SHIFT_HOURS) - 100, 0
+        ).astype(int)
+
+        alloc_tbl = df_alloc[[id_col, name_col, "Predicted_Burglaries", "stress", "Officers needed", "Extra (off >100)"]].rename(
+            columns={id_col: "Code",
+                     name_col: "Ward",
+                     "Predicted_Burglaries": "Pred burglaries",
+                     "stress": "Stress"}
+        ).sort_values("Stress", ascending=False)
+
+        # Removed duplicate search table for officer allocation
+    else:  # LSOA Forecast
+
+        st.markdown("### 🛡️ Within-ward officer split across LSOAs")
+
+        lkp = pd.read_csv(LOOKUP_CSV)[["LSOA21CD", "WD24CD", "WD24NM"]]
+        lsoa_w = df_show.merge(lkp, on="LSOA21CD", how="left")
+
+        wards_available = sorted(lsoa_w["WD24NM"].dropna().unique())
+        sel_ward = st.selectbox("Ward to split its 100 officers", wards_available)
+
+        # Compute aggregated ward-level predictions to determine total predicted burglaries and required officers per ward
+        ward_alloc = lsoa_w.groupby("WD24NM").agg({"Predicted_Burglaries": "sum"}).reset_index()
+        ward_alloc["Officers needed"] = np.minimum(100, np.ceil(ward_alloc["Predicted_Burglaries"] * off_per_burg)).astype(int)
+        ward_need = int(ward_alloc.loc[ward_alloc["WD24NM"] == sel_ward, "Officers needed"].iloc[0])
+
+        total_burg = lsoa_w[lsoa_w["WD24NM"] == sel_ward]["Predicted_Burglaries"].sum()
+
+        if ward_need == 0 or total_burg == 0:
+            st.info("No officers required for this ward.")
+        else:
+            # proportional split of <ward_need> officers across LSOAs in the ward
+            ward_lsoas = lsoa_w[lsoa_w["WD24NM"] == sel_ward].copy()
+            ward_lsoas["raw"]   = ward_lsoas["Predicted_Burglaries"] / total_burg * ward_need
+            ward_lsoas["floor"] = np.floor(ward_lsoas["raw"]).astype(int)
+            remainder = ward_need - ward_lsoas["floor"].sum()
+            ward_lsoas["fraction"] = ward_lsoas["raw"] - ward_lsoas["floor"]
+            ward_lsoas = ward_lsoas.sort_values("fraction", ascending=False)
+            ward_lsoas.iloc[:remainder, ward_lsoas.columns.get_loc("floor")] += 1
+            ward_lsoas = ward_lsoas.sort_values("floor", ascending=False)
+
+            lsoa_alloc_tbl = ward_lsoas[["LSOA21CD", "LSOA21NM", "Predicted_Burglaries", "floor"]].rename(
+                columns={"LSOA21CD": "LSOA code",
+                         "LSOA21NM": "LSOA",
+                         "Predicted_Burglaries": "Pred burglaries",
+                         "floor": "Allocated officers"}
+            )
+
+            # NEW: Add search input for filtering by LSOA Code or Name
+            search_alloc_lsoa = st.text_input("Search by LSOA code or name", key="lsoa_alloc_search")
+            if search_alloc_lsoa:
+                lsoa_alloc_tbl = lsoa_alloc_tbl[
+                    lsoa_alloc_tbl["LSOA code"].str.contains(search_alloc_lsoa, case=False) |
+                    lsoa_alloc_tbl["LSOA"].str.contains(search_alloc_lsoa, case=False)
+                ]
+            st.dataframe(lsoa_alloc_tbl, use_container_width=True)
+# ────────────────────────────────────────────────────────────────────────────
+#  END OF ADDITIONS
+# ────────────────────────────────────────────────────────────────────────────
