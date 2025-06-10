@@ -38,6 +38,49 @@ Our analysis pipeline processes raw police data into ward-level and LSOA-level a
 - Presents monthly burglary counts and model predictions in dynamic charts and maps.
 - Presents police force resource allocation for each ward and LSOA based on the predictions.
 
+## Features Used for XGBoost Burglary Predictions
+The XGBoost model leverages a robust set of features to forecast monthly burglary counts. The main categories of features include:
+
+- Time components:
+   - year - The calendar year extracted from the Month timestamp.
+   - month - The numerical month (1-12) extracted from the Month column.
+   - quarter - The quarter of the year (1-4) corresponding to the Month.
+   - is_summer - A binary flag (1/0) indicating if the month falls in summer (typically June, July, August).
+   - is_winter - A binary flag (1/0) that is set when the month is in winter (December, January, February).
+
+- Lagged values (historical burglary counts):
+   - burglaries_lag_1 - The number of burglaries in the previous month (1‐month lag).
+   - burglaries_lag_2 - The burglary count two months ago.
+   - burglaries_lag_3 - The burglary count three months earlier.
+   - burglaries_lag_6 - The burglary count from six months ago.
+   - burglaries_lag_12 - The value from 12 months ago (year‐ago comparison).
+
+- Rolling statistics (aggregated measures over a window):
+   - burglaries_rollmean_3 - The 3‑month rolling mean of burglaries, which smooths short‐term fluctuations.
+   - burglaries_rollmean_6 - The 6‑month rolling average of burglaries.
+   - burglaries_rollmean_12 - The 12‑month (yearly) rolling average.
+   - burglaries_rollstd_3 - The rolling standard deviation over 3 months, used to capture short‐term variability.
+   - burglaries_rollstd_6 - The 6‑month rolling standard deviation of burglary counts.
+   - burglaries_rollstd_12 - The 12‑month rolling standard deviation, summarizing annual variability.
+
+- Trend indicators:
+   - trend_3m - Measures the short-term trend by comparing the 3‑month rolling mean with the value 3 months ago.
+   - trend_6m - The medium-term trend using the 6‑month rolling average against the corresponding lag.
+   - trend_12m - The long-term trend by comparing the 12‑month rolling mean to the burglary count from 12 months ago.
+   - yoy_change - The year-over-year change in burglaries (current value minus the value 12 months earlier).
+
+- Socio-economic indicators:
+   - population - The ward population taken from the ward population dataset.
+   - burglary_rate - A derived rate (burglaries per 1,000 people), calculated from the burglary count and ward population.
+   - imd_score - The Index of Multiple Deprivation score reflects socioeconomic deprivation at ward level.
+   - income_score - A measure of income deprivation (often given as a rate).
+   - employment_score - Reflects the level of employment deprivation.
+   - crime_score - A score indicating crime deprivation (not to be confused with the burglaries count).
+   - health_score - Indicates health-related deprivation in the area.
+   - housing_score - Captures housing-related deprivation.
+   - environment_score - A score describing the quality of the local living environment, such as air quality and green space.
+
+These features combine to help the model understand temporal patterns and local contextual factors, ensuring more accurate burglary predictions across Greater London.
 ## Project Structure
 ```
 ├── data/                                # Contains raw police monthly data (December 2010 - February 2025)
