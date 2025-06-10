@@ -105,22 +105,51 @@ def attach_ward(df: pd.DataFrame, lookup_csv: Path) -> pd.DataFrame:
     return merged.dropna(subset=["WD24CD"])
 
 
-def aggregate_lsoa(df: pd.DataFrame, lookup_csv: Path) -> pd.DataFrame:
-    """Return tidy LSOA-month panel for burglaries."""
-    lsoa_lookup = pd.read_csv(lookup_csv, usecols=["LSOA21CD", "LSOA21NM"])
-    # Assuming 'LSOA code' in df (from ingest_raw) corresponds to 'LSOA21CD'
-    merged_df = df.merge(lsoa_lookup, left_on="LSOA code", right_on="LSOA21CD", how="left")
-    
-    # Drop rows where LSOA code/name couldn't be matched or LSOA21NM is NaN
-    merged_df.dropna(subset=["LSOA21CD", "LSOA21NM", DATE_COL], inplace=True)
-    
-    return (
-        merged_df.groupby([pd.Grouper(key=DATE_COL, freq="MS"), "LSOA21CD", "LSOA21NM"])
-        .size()
-        .rename("burglaries")
-        .reset_index()
-        .sort_values(["Month", "LSOA21CD"])
+def aggregate(df: pd.DataFrame) -> pd.DataFrame:
+    """Return tidy ward‑month panel aggregating by code, then combining duplicate names."""
+    # First aggregate by code
+    base = (
+        df.groupby([pd.Grouper(key=DATE_COL, freq="MS"), "WD24CD", "WD24NM"])
+          .size()
+          .rename("burglaries")
+          .reset_index()
     )
+    # Then combine rows sharing the same ward name across different codes
+    agg_df = (
+        base.groupby([DATE_COL, "WD24NM"])
+            .agg(
+                burglaries=("burglaries", "sum"),
+                WD24CD=("WD24CD", lambda codes: codes.iloc[0])
+            )
+            .reset_index()
+            .sort_values([DATE_COL, "WD24CD"])
+    )
+    return agg_df
+
+
+def aggregate_lsoa(df: pd.DataFrame, lookup_csv: Path) -> pd.DataFrame:
+    """Return tidy LSOA-month panel for burglaries aggregating by code then combining duplicate LSOA names."""
+    lsoa_lookup = pd.read_csv(lookup_csv, usecols=["LSOA21CD", "LSOA21NM"])
+    merged_df = df.merge(lsoa_lookup, left_on="LSOA code", right_on="LSOA21CD", how="left")
+    merged_df.dropna(subset=["LSOA21CD", "LSOA21NM", DATE_COL], inplace=True)
+    # First aggregate by LSOA code
+    base = (
+        merged_df.groupby([pd.Grouper(key=DATE_COL, freq="MS"), "LSOA21CD", "LSOA21NM"])
+          .size()
+          .rename("burglaries")
+          .reset_index()
+    )
+    # Then combine rows sharing the same LSOA name across different codes
+    agg_df = (
+        base.groupby([DATE_COL, "LSOA21NM"])
+            .agg(
+                burglaries=("burglaries", "sum"),
+                LSOA21CD=("LSOA21CD", lambda codes: codes.iloc[0])
+            )
+            .reset_index()
+            .sort_values([DATE_COL, "LSOA21CD"])
+    )
+    return agg_df
 
 
 def attach_geometries(df: pd.DataFrame, geojson_path: Path) -> gpd.GeoDataFrame:
@@ -130,17 +159,6 @@ def attach_geometries(df: pd.DataFrame, geojson_path: Path) -> gpd.GeoDataFrame:
     # Merge geometries with ward data
     merged = df.merge(wards_gdf[["WD24CD", "geometry"]], on="WD24CD")
     return gpd.GeoDataFrame(merged, geometry="geometry", crs=wards_gdf.crs)
-
-
-def aggregate(df: pd.DataFrame) -> pd.DataFrame:
-    """Return tidy ward‑month panel."""
-    return (
-        df.groupby([pd.Grouper(key=DATE_COL, freq="MS"), "WD24CD", "WD24NM"])
-          .size()
-          .rename("burglaries")
-          .reset_index()
-          .sort_values(["Month", "WD24CD"])
-    )
 
 
 def save_outputs(ward_df: pd.DataFrame, ward_gdf: gpd.GeoDataFrame, lsoa_df: pd.DataFrame, out_dir: Path) -> None:
