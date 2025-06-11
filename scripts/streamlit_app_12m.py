@@ -1,5 +1,5 @@
 """
-Streamlit dashboard prototype - London Residential Burglary
+Streamlit dashboard - Interactive visualization and prediction tool of burglaries in Greater London
 
 ================================================================
 Run locally:
@@ -127,7 +127,7 @@ view_mode = st.sidebar.radio("Type of Analysis",
 
 #officers required per predicted burglary (default 2)
 off_per_burg = st.sidebar.slider(
-    "Officers per burglary assumption", 1, 4, 2, 1
+    "Officers needed per burglary assumption", 1, 4, 2, 1
 )
 
 #new: Add forecast type selector when in Future Forecast mode
@@ -232,7 +232,7 @@ chor['fill_color'] = chor['fill_color'].apply(lambda rgb: [int(c * 255) for c in
 
 # ── main layout -------------------------------------------------------------
 #update title and subtitle
-st.title("Residential Burglary in London")
+st.title("Interactive visualization and prediction tool of burglaries in Greater London")
 if view_mode == "Future Forecast":
     subtitle = f"Forecast for {selected_forecast_date.strftime('%B %Y')}"
 else:
@@ -529,7 +529,7 @@ if view_mode == "Future Forecast":
 
 if view_mode == "Future Forecast":
     show_alloc = st.sidebar.checkbox(
-        "Police resource allocation", value=False,
+        "Police resource allocation", value=True,
         help="Toggle recommended officer assignments based on predicted "
              "burglary demand and capacity/stress scores."
     )
@@ -591,7 +591,7 @@ if show_alloc and view_mode == "Future Forecast":
                             .head(10)
                             .rename(columns={"extra": "Total extra officers"}))
 
-        st.markdown("#### 📆 Suggested special-operation wards (next 4 months)")
+        st.markdown("#### Suggested special-operation wards (next 4 months)")
         if spec_tbl.empty:
             st.write("No wards exceed routine capacity in the next four-month window.")
         else:
@@ -624,7 +624,7 @@ if show_alloc and view_mode == "Future Forecast":
         #removed duplicate search table for officer allocation
     else:  #LSOA Forecast
 
-        st.markdown("### 🛡️ Within-ward officer split across LSOAs")
+        st.markdown("### Within-ward officer split across LSOAs")
 
         lkp = pd.read_csv(LOOKUP_CSV)[["LSOA21CD", "WD24CD", "WD24NM"]]
         lsoa_w = df_show.merge(lkp, on="LSOA21CD", how="left")
