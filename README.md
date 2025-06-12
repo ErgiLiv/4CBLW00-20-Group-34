@@ -56,22 +56,15 @@ The XGBoost model leverages a robust set of features to forecast monthly burglar
    - burglaries_lag_12 - The value from 12 months ago (year‐ago comparison).
 
 - Rolling statistics (aggregated measures over a window):
-   - burglaries_rollmean_3 - The 3‑month rolling mean of burglaries, which smooths short‐term fluctuations.
-   - burglaries_rollmean_6 - The 6‑month rolling average of burglaries.
-   - burglaries_rollmean_12 - The 12‑month (yearly) rolling average.
-   - burglaries_rollstd_3 - The rolling standard deviation over 3 months, used to capture short‐term variability.
-   - burglaries_rollstd_6 - The 6‑month rolling standard deviation of burglary counts.
-   - burglaries_rollstd_12 - The 12‑month rolling standard deviation, summarizing annual variability.
-
-- Trend indicators:
-   - trend_3m - Measures the short-term trend by comparing the 3‑month rolling mean with the value 3 months ago.
-   - trend_6m - The medium-term trend using the 6‑month rolling average against the corresponding lag.
-   - trend_12m - The long-term trend by comparing the 12‑month rolling mean to the burglary count from 12 months ago.
-   - yoy_change - The year-over-year change in burglaries (current value minus the value 12 months earlier).
+   - burglaries_rollmean_3 - The previous 3‑month rolling average of burglaries, which smooths short‐term fluctuations.
+   - burglaries_rollmean_6 - The previous 6‑month rolling average of burglaries.
+   - burglaries_rollmean_12 - The previous 12‑month (yearly) rolling average.
+   - burglaries_rollstd_3 - The rolling standard deviation over 3 previous months, used to capture short‐term variability.
+   - burglaries_rollstd_6 - The previous 6‑month rolling standard deviation of burglary counts.
+   - burglaries_rollstd_12 - The previous 12‑month rolling standard deviation, summarizing annual variability.
 
 - Socio-economic indicators:
    - population - The ward population taken from the ward population dataset.
-   - burglary_rate - A derived rate (burglaries per 1,000 people), calculated from the burglary count and ward population.
    - imd_score - The Index of Multiple Deprivation score reflects socioeconomic deprivation at ward level.
    - income_score - A measure of income deprivation (often given as a rate).
    - employment_score - Reflects the level of employment deprivation.
@@ -81,6 +74,7 @@ The XGBoost model leverages a robust set of features to forecast monthly burglar
    - environment_score - A score describing the quality of the local living environment, such as air quality and green space.
 
 These features combine to help the model understand temporal patterns and local contextual factors, ensuring more accurate burglary predictions across Greater London.
+
 ## Project Structure
 ```
 ├── data/                                # Contains raw police monthly data (December 2010 - February 2025)
@@ -131,7 +125,7 @@ These features combine to help the model understand temporal patterns and local 
    python scripts/ingest_burglary.py   #Run time: ~3 minutes (depending on device performance)
    ```
    ```bash            
-   python scripts/xgboost_predictions_12m.py    #Run time: ~3 hours (depending on device performance)
+   python scripts/xgboost_predictions_12m.py    #Run time: ~15 seconds (depending on device performance)
    ```
    ```bash            
    streamlit run scripts/streamlit_app_12m.py    #Loading time: ~30 seconds

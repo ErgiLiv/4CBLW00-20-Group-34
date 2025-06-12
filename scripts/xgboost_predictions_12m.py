@@ -33,42 +33,53 @@ PROCESSED = DATA / "processed"
 LOOKUPS = DATA / "lookups"
 PREDICTIONS = ROOT / "predictions"
 
-def create_time_features(df: pd.DataFrame) -> pd.DataFrame:
-    """Create time-based features from the Month column."""
+def create_time_features(df: pd.DataFrame, group_key: str | None = None) -> pd.DataFrame:
+    """
+    Adds lag / rolling / calendar features.
+    If *group_key* is None, the function picks the most-granular ID
+    present in *df* (preferring LSOA21CD over WD24CD).
+    """
     df = df.copy()
-    
-    #basic time components
-    df['year'] = df['Month'].dt.year
-    df['month'] = df['Month'].dt.month
-    df['quarter'] = df['Month'].dt.quarter
-    
-    #seasonal indicators
+
+    # -------- determine grouping column ----------------------------
+    if group_key is None:
+        if 'LSOA21CD' in df.columns and 'WD24CD' in df.columns:
+            group_key = (
+                'LSOA21CD'
+                if df['LSOA21CD'].nunique() > df['WD24CD'].nunique()
+                else 'WD24CD'
+            )
+        else:
+            group_key = 'LSOA21CD' if 'LSOA21CD' in df.columns else 'WD24CD'
+
+    # -------- time components --------------------------------------
+    df['year']     = df['Month'].dt.year
+    df['month']    = df['Month'].dt.month
+    df['quarter']  = df['Month'].dt.quarter
     df['is_summer'] = df['month'].isin([6, 7, 8]).astype(int)
     df['is_winter'] = df['month'].isin([12, 1, 2]).astype(int)
-    
-    #lagged features (essential for multi-month forecasting)
+
+    # -------- pure lags --------------------------------------------
     for lag in [1, 2, 3, 6, 12]:
-        df[f'burglaries_lag_{lag}'] = df.groupby('WD24CD')['burglaries'].shift(lag)
-    
-    #rolling statistics
-    for window in [3, 6, 12]:
-        #mean
-        df[f'burglaries_rollmean_{window}'] = df.groupby('WD24CD')['burglaries'].transform(
-            lambda x: x.rolling(window=window, min_periods=1).mean()
+        df[f'burglaries_lag_{lag}'] = (
+            df.groupby(group_key)['burglaries'].shift(lag)
         )
-        #standard deviation for uncertainty
-        df[f'burglaries_rollstd_{window}'] = df.groupby('WD24CD')['burglaries'].transform(
-            lambda x: x.rolling(window=window, min_periods=1).std()
+
+    # -------- trailing rolling stats -------------------------------
+    grp = df.groupby(group_key)['burglaries']
+    for w in [3, 6, 12]:
+        df[f'burglaries_rollmean_{w}'] = (
+            grp.shift(1).rolling(w, min_periods=1).mean()
         )
-    
-    #trend indicators
-    df['trend_3m'] = df['burglaries_rollmean_3'] - df['burglaries_lag_3']
-    df['trend_6m'] = df['burglaries_rollmean_6'] - df['burglaries_lag_6']
-    df['trend_12m'] = df['burglaries_rollmean_12'] - df['burglaries_lag_12']
-    
-    #year-over-year change
-    df['yoy_change'] = df['burglaries'] - df['burglaries_lag_12']
-    
+        df[f'burglaries_rollstd_{w}'] = (
+            grp.shift(1).rolling(w, min_periods=1).std()
+        )
+
+    # -------- trend ------------------------------------------
+    #df['trend_3m']  = df['burglaries_rollmean_3']  - df['burglaries_lag_3']
+    #df['trend_6m']  = df['burglaries_rollmean_6']  - df['burglaries_lag_6']
+    #df['trend_12m'] = df['burglaries_rollmean_12'] - df['burglaries_lag_12']
+
     return df
 
 def load_ward_population(ward_pop_file: Path) -> pd.DataFrame:
@@ -164,9 +175,6 @@ def prepare_features(df: pd.DataFrame) -> Tuple[pd.DataFrame, list]:
     df = pd.merge(df, ward_pop, on='WD24CD', how='left')
     df = pd.merge(df, ward_imd, on='WD24CD', how='left')
     
-    #calculate rate-based features
-    df['burglary_rate'] = (df['burglaries'] * 1000) / df['population']
-    
     #create time features
     df = create_time_features(df)
     
@@ -180,14 +188,18 @@ def prepare_features(df: pd.DataFrame) -> Tuple[pd.DataFrame, list]:
         'burglaries_lag_6', 'burglaries_lag_12',
         
         #rolling statistics
-        'burglaries_rollmean_3', 'burglaries_rollmean_6', 'burglaries_rollmean_12',
-        'burglaries_rollstd_3', 'burglaries_rollstd_6', 'burglaries_rollstd_12',
+        'burglaries_rollmean_3', 
+        'burglaries_rollmean_6', 
+        'burglaries_rollmean_12',
+        'burglaries_rollstd_3', 
+        'burglaries_rollstd_6', 
+        'burglaries_rollstd_12',
         
         #trend indicators
-        'trend_3m', 'trend_6m', 'trend_12m', 'yoy_change',
+        #'trend_3m', 'trend_6m', 'trend_12m',
         
         #socioeconomic indicators
-        'population', 'burglary_rate',
+        'population', 
         'imd_score', 'income_score', 'employment_score',
         'crime_score', 'health_score', 'housing_score',
         'environment_score'
@@ -211,7 +223,6 @@ def prepare_features_lsoa(df: pd.DataFrame) -> tuple:
     df = pd.merge(df, lsoa_pop, on='LSOA21CD', how='left')
     df = pd.merge(df, lsoa_imd, on='LSOA21CD', how='left')
     
-    df['burglary_rate'] = (df['burglaries'] * 1000) / df['population']
     df = create_time_features(df)
     
     feature_cols = [
@@ -219,10 +230,14 @@ def prepare_features_lsoa(df: pd.DataFrame) -> tuple:
         'year', 'month', 'quarter', 'is_summer', 'is_winter',
         'burglaries_lag_1', 'burglaries_lag_2', 'burglaries_lag_3',
         'burglaries_lag_6', 'burglaries_lag_12',
-        'burglaries_rollmean_3', 'burglaries_rollmean_6', 'burglaries_rollmean_12',
-        'burglaries_rollstd_3', 'burglaries_rollstd_6', 'burglaries_rollstd_12',
-        'trend_3m', 'trend_6m', 'trend_12m', 'yoy_change',
-        'population', 'burglary_rate',
+        'burglaries_rollmean_3', 
+        'burglaries_rollmean_6', 
+        'burglaries_rollmean_12',
+        'burglaries_rollstd_3', 
+        'burglaries_rollstd_6', 
+        'burglaries_rollstd_12',
+        #'trend_3m', 'trend_6m', 'trend_12m',
+        'population', 
         'imd_score', 'income_score', 'employment_score',
         'crime_score', 'health_score', 'housing_score',
         'environment_score'
@@ -230,7 +245,7 @@ def prepare_features_lsoa(df: pd.DataFrame) -> tuple:
     df = df.dropna(subset=feature_cols)
     return df, feature_cols
 
-def train_model(df: pd.DataFrame, feature_cols: list) -> Tuple[xgb.XGBRegressor, StandardScaler]:
+def train_model(df: pd.DataFrame, feature_cols: list, level: str = "Ward") -> Tuple[xgb.XGBRegressor, StandardScaler]:
     """Train XGBoost model with carefully tuned parameters."""
     
     #split data keeping most recent data for testing
@@ -312,7 +327,7 @@ def train_model(df: pd.DataFrame, feature_cols: list) -> Tuple[xgb.XGBRegressor,
     
     #save the plot to the predictions folder
     PREDICTIONS.mkdir(exist_ok=True)
-    plot_path = PREDICTIONS / "residuals_analysis.png"
+    plot_path = PREDICTIONS / f"residuals_analysis_{level}.png"
     plt.savefig(plot_path, dpi=300)
     
 
@@ -345,152 +360,175 @@ def train_model(df: pd.DataFrame, feature_cols: list) -> Tuple[xgb.XGBRegressor,
     
     return model, scaler
 
-#new function: Recursive forecasting per LSOA
-def predict_next_n_months_lsoa(df: pd.DataFrame, model: xgb.XGBRegressor, 
-                               scaler: StandardScaler, feature_cols: list, 
+def predict_next_n_months_lsoa(df: pd.DataFrame,
+                               model: xgb.XGBRegressor,
+                               scaler: StandardScaler,
+                               feature_cols: list,
                                n_months: int = 12) -> pd.DataFrame:
     latest_date = df['Month'].max()
+    history = (
+        df.sort_values(['LSOA21CD', 'Month'])
+          .groupby('LSOA21CD', group_keys=False)
+          .tail(12)              #keep only the most recent 12 months per LSOA
+          .reset_index(drop=True)
+    )
+
     predictions_list = []
-    
-    current_df = df.copy()
-    unique_lsoas = df['LSOA21CD'].unique()
-    #for LSOA naming, we simply use the LSOA code (or augment with lookup if needed)
-    print(f"\nGenerating LSOA-level predictions for {n_months} months across {len(unique_lsoas)} LSOAs...")
-    
+    unique_lsoas = history['LSOA21CD'].unique()
+
     for i in tqdm(range(1, n_months + 1), desc="Predicting months"):
         next_month = latest_date + pd.DateOffset(months=i)
-        pred_rows = []
-        for lsoa in tqdm(unique_lsoas, desc=f"Processing LSOAs for {next_month.strftime('%B %Y')}", leave=False):
-            lsoa_data = current_df[current_df['LSOA21CD'] == lsoa].copy()
-            #update time features
-            lsoa_data['Month'] = next_month
-            lsoa_data = create_time_features(lsoa_data)
-            pred_row = lsoa_data.iloc[-1:]
-            pred_row['LSOA'] = lsoa  #add LSOA identifier column
-            pred_rows.append(pred_row)
-        pred_df = pd.concat(pred_rows, ignore_index=True)
-        X_pred = scaler.transform(pred_df[feature_cols])
-        predictions = model.predict(X_pred)
-        
-        #enforce predictions within 2 std deviations of historical mean per LSOA
-        last_year_same_month = latest_date - pd.DateOffset(months=12-i)
-        historical_stats = df[df['Month'] == last_year_same_month].groupby('LSOA21CD')['burglaries'].agg(['mean', 'std'])
-        for idx, lsoa in enumerate(unique_lsoas):
-            if lsoa in historical_stats.index:
-                mean = historical_stats.loc[lsoa, 'mean']
-                std = max(1, historical_stats.loc[lsoa, 'std'])
-                predictions[idx] = np.clip(predictions[idx], mean - 2*std, mean + 2*std)
-                
-        pred_std = pred_df[['burglaries_rollstd_3', 'burglaries_rollstd_6', 'burglaries_rollstd_12']].mean(axis=1)
-        lower_ci = np.maximum(predictions - 1.96 * pred_std, 0)
-        upper_ci = np.minimum(predictions + 1.96 * pred_std, predictions * 2)
-        
+
+        # ---- build one batch for all LSOAs ---------------------------------
+        to_pred = (
+            history.sort_values(['LSOA21CD', 'Month'])
+                   .groupby('LSOA21CD', group_keys=False)
+                   .tail(1)                         #last known row per LSOA
+                   .copy()
+        )
+        to_pred['Month'] = next_month
+        to_pred = create_time_features(to_pred, group_key='LSOA21CD')
+
+        X_pred = scaler.transform(to_pred[feature_cols])
+        y_pred = model.predict(X_pred)
+
+        # ---- clip with same-month last-year stats --------------------------
+        last_year_month = next_month - pd.DateOffset(months=12)
+        hist_stats = (
+            df[df['Month'] == last_year_month]
+              .groupby('LSOA21CD')['burglaries']
+              .agg(['mean', 'std'])
+        )
+        aligned = to_pred['LSOA21CD']                    #preserves row order
+        mean = hist_stats['mean'].reindex(aligned)
+        std  = hist_stats['std'].reindex(aligned).fillna(1)
+        mask = mean.notna().values
+        y_pred[mask] = np.clip(
+            y_pred[mask],
+            mean[mask] - 2 * std[mask],
+            mean[mask] + 2 * std[mask]
+        )
+
+        # ---- prediction intervals -----------------------------------------
+        pred_std = to_pred[
+            ['burglaries_rollstd_3',
+             'burglaries_rollstd_6',
+             'burglaries_rollstd_12']
+        ].mean(axis=1)
+        pred_std = pred_std.fillna(0)
+        lower_ci = np.maximum(y_pred - 1.96 * pred_std, 0)
+        upper_ci = np.minimum(y_pred + 1.96 * pred_std, y_pred * 2)
+
         results = pd.DataFrame({
-            'LSOA': pred_df['LSOA'],
+            'LSOA': to_pred['LSOA21CD'],
             'Month': next_month,
-            'Predicted_Burglaries': np.nan_to_num(np.round(predictions, 0)).astype(int),
+            'Predicted_Burglaries': np.nan_to_num(np.round(y_pred, 0)).astype(int),
             'Lower_CI': np.nan_to_num(np.round(lower_ci, 0)).astype(int),
             'Upper_CI': np.nan_to_num(np.round(upper_ci, 0)).astype(int),
-            'Previous_Month_Actual': np.nan_to_num(np.round(pred_df['burglaries'].values, 0)).astype(int)
+            'Previous_Month_Actual': np.nan_to_num(np.round(to_pred['burglaries'].values, 0)).astype(int)
         })
         predictions_list.append(results)
-        
-        for idx, lsoa in enumerate(unique_lsoas):
-            mask = current_df['LSOA21CD'] == lsoa
-            new_row = current_df[mask].iloc[-1:].copy()
-            new_row['Month'] = next_month
-            new_row['burglaries'] = predictions[idx]
-            current_df = pd.concat([current_df, new_row], ignore_index=True)
-    
+
+        # ---- update rolling history ---------------------------------------
+        new_rows = to_pred[['LSOA21CD', 'Month']].copy()
+        new_rows['burglaries'] = y_pred
+        history = pd.concat([history, new_rows], ignore_index=True)
+        history = (
+            history.sort_values(['LSOA21CD', 'Month'])
+                   .groupby('LSOA21CD', group_keys=False)
+                   .tail(12)         #keep only trailing window
+                   .reset_index(drop=True)
+        )
+
     final_predictions = pd.concat(predictions_list, ignore_index=True)
     return final_predictions.sort_values(['Month', 'LSOA'])
 
-def predict_next_n_months(df: pd.DataFrame, model: xgb.XGBRegressor, 
-                         scaler: StandardScaler, feature_cols: list, 
-                         n_months: int = 12) -> pd.DataFrame:
-    """Predict burglaries for next n months using recursive forecasting."""
-    
-    #start with the most recent data
+
+def predict_next_n_months(df: pd.DataFrame,
+                          model: xgb.XGBRegressor,
+                          scaler: StandardScaler,
+                          feature_cols: list,
+                          n_months: int = 12) -> pd.DataFrame:
     latest_date = df['Month'].max()
+    history = (
+        df.sort_values(['WD24CD', 'Month'])
+          .groupby('WD24CD', group_keys=False)
+          .tail(12)                 #most recent 12 months per ward
+          .reset_index(drop=True)
+    )
+    ward_names = (
+        df[['WD24CD', 'WD24NM']]
+        .drop_duplicates()
+        .set_index('WD24CD')['WD24NM']
+    )
+
     predictions_list = []
-    
-    #create a copy of the latest data to update iteratively
-    current_df = df.copy()
-    
-    #get unique wards once
-    unique_wards = df['WD24CD'].unique()
-    ward_names = df[['WD24CD', 'WD24NM']].drop_duplicates().set_index('WD24CD')['WD24NM']
-    
-    print(f"\nGenerating predictions for {n_months} months across {len(unique_wards)} wards...")
-    
-    #progress bar for months
+    unique_wards = history['WD24CD'].unique()
+
     for i in tqdm(range(1, n_months + 1), desc="Predicting months"):
-        #calculate next month
         next_month = latest_date + pd.DateOffset(months=i)
-        
-        #create prediction data for each ward
-        pred_rows = []
-        #progress bar for wards (nested, leave=False to keep it clean)
-        for ward_code in tqdm(unique_wards, desc=f"Processing wards for {next_month.strftime('%B %Y')}", leave=False):
-            #get ward's data
-            ward_data = current_df[current_df['WD24CD'] == ward_code].copy()
-            ward_name = ward_names[ward_code]
-            
-            #update time features for next month
-            ward_data['Month'] = next_month
-            ward_data = create_time_features(ward_data)
-            
-            #select most recent row
-            pred_row = ward_data.iloc[-1:]
-            
-            #include ward identifier columns
-            pred_row['Ward'] = ward_name
-            pred_rows.append(pred_row)
-        
-        #combine all wards
-        pred_df = pd.concat(pred_rows, ignore_index=True)
-        
-        #make predictions
-        X_pred = scaler.transform(pred_df[feature_cols])
-        predictions = model.predict(X_pred)
-        
-        #ensure predictions stay within reasonable bounds
-        last_year_same_month = latest_date - pd.DateOffset(months=12-i)
-        historical_stats = df[df['Month'] == last_year_same_month].groupby('WD24CD')['burglaries'].agg(['mean', 'std'])
-        
-        #for each ward, ensure prediction is within 2 standard deviations of historical mean
-        for idx, ward_code in enumerate(unique_wards):
-            if ward_code in historical_stats.index:
-                mean = historical_stats.loc[ward_code, 'mean']
-                std = max(1, historical_stats.loc[ward_code, 'std'])  #minimum std of 1
-                predictions[idx] = np.clip(predictions[idx], mean - 2*std, mean + 2*std)
-        
-        #calculate prediction intervals using historical variability
-        pred_std = pred_df[['burglaries_rollstd_3', 'burglaries_rollstd_6', 'burglaries_rollstd_12']].mean(axis=1)
-        lower_ci = np.maximum(predictions - 1.96 * pred_std, 0)  #ensure non-negative
-        upper_ci = np.minimum(predictions + 1.96 * pred_std, predictions * 2)  #cap at double the prediction
-        
-        #create results dataframe
+
+        # ---- batch build ---------------------------------------------------
+        to_pred = (
+            history.sort_values(['WD24CD', 'Month'])
+                   .groupby('WD24CD', group_keys=False)
+                   .tail(1)
+                   .copy()
+        )
+        to_pred['Month'] = next_month
+        to_pred = create_time_features(to_pred, group_key='WD24CD')
+
+        X_pred = scaler.transform(to_pred[feature_cols])
+        y_pred = model.predict(X_pred)
+
+        # ---- clip with same-month last-year stats --------------------------
+        last_year_month = next_month - pd.DateOffset(months=12)
+        hist_stats = (
+            df[df['Month'] == last_year_month]
+              .groupby('WD24CD')['burglaries']
+              .agg(['mean', 'std'])
+        )
+        aligned = to_pred['WD24CD']                    #preserves row order
+        mean = hist_stats['mean'].reindex(aligned)
+        std  = hist_stats['std'].reindex(aligned).fillna(1)
+        mask = mean.notna().values           #skip wards with no history
+        y_pred[mask] = np.clip(
+            y_pred[mask],
+            mean[mask] - 2 * std[mask],
+            mean[mask] + 2 * std[mask]
+        )
+
+        # ---- prediction intervals -----------------------------------------
+        pred_std = to_pred[
+            ['burglaries_rollstd_3',
+             'burglaries_rollstd_6',
+             'burglaries_rollstd_12']
+        ].mean(axis=1)
+        pred_std = pred_std.fillna(0)
+        lower_ci = np.maximum(y_pred - 1.96 * pred_std, 0)
+        upper_ci = np.minimum(y_pred + 1.96 * pred_std, y_pred * 2)
+
         results = pd.DataFrame({
-            'Ward': pred_df['Ward'],
+            'Ward': [ward_names[c] for c in to_pred['WD24CD']],
             'Month': next_month,
-            'Predicted_Burglaries': np.nan_to_num(np.round(predictions, 0)).astype(int),
+            'Predicted_Burglaries': np.nan_to_num(np.round(y_pred, 0)).astype(int),
             'Lower_CI': np.nan_to_num(np.round(lower_ci, 0)).astype(int),
             'Upper_CI': np.nan_to_num(np.round(upper_ci, 0)).astype(int),
-            'Previous_Month_Actual': np.nan_to_num(np.round(pred_df['burglaries'].values, 0)).astype(int)
+            'Previous_Month_Actual': np.nan_to_num(np.round(to_pred['burglaries'].values, 0)).astype(int)
         })
-        
         predictions_list.append(results)
-        
-        #update current_df with new predictions for next iteration
-        for idx, ward_code in enumerate(unique_wards):
-            mask = current_df['WD24CD'] == ward_code
-            new_row = current_df[mask].iloc[-1:].copy()
-            new_row['Month'] = next_month
-            new_row['burglaries'] = predictions[idx]
-            current_df = pd.concat([current_df, new_row], ignore_index=True)
-    
-    #combine all months
+
+        # ---- update rolling history ---------------------------------------
+        new_rows = to_pred[['WD24CD', 'Month']].copy()
+        new_rows['burglaries'] = y_pred
+        history = pd.concat([history, new_rows], ignore_index=True)
+        history = (
+            history.sort_values(['WD24CD', 'Month'])
+                   .groupby('WD24CD', group_keys=False)
+                   .tail(12)
+                   .reset_index(drop=True)
+        )
+
     final_predictions = pd.concat(predictions_list, ignore_index=True)
     return final_predictions.sort_values(['Month', 'Ward'])
 
@@ -502,7 +540,7 @@ def main():
     print(f"Created {len(feature_cols)} features for wards")
     
     print("\nTraining ward-level model...")
-    model, scaler = train_model(df, feature_cols)
+    model, scaler = train_model(df, feature_cols, level="Ward")
     
     ward_predictions = predict_next_n_months(df, model, scaler, feature_cols, n_months=12)
     output_path = PREDICTIONS / "ward_burglary_predictions_12m.csv"
@@ -520,7 +558,7 @@ def main():
     print(f"Created {len(feature_cols_lsoa)} features for LSOAs")
     
     print("\nTraining LSOA-level model...")
-    model_lsoa, scaler_lsoa = train_model(df_lsoa, feature_cols_lsoa)
+    model_lsoa, scaler_lsoa = train_model(df_lsoa, feature_cols_lsoa, level="LSOA")
     
     lsoa_predictions = predict_next_n_months_lsoa(df_lsoa, model_lsoa, scaler_lsoa, feature_cols_lsoa, n_months=12)
     output_lsoa_path = PREDICTIONS / "lsoa_burglary_predictions_12m.csv"
