@@ -20,10 +20,13 @@ from pathlib import Path
 import xgboost as xgb
 from sklearn.metrics import mean_squared_error, r2_score
 from sklearn.preprocessing import StandardScaler
+from sklearn.model_selection import TimeSeriesSplit, RandomizedSearchCV
+from scipy.stats import randint, uniform, loguniform
 from typing import Tuple
 from tqdm.auto import tqdm
 import warnings
 import matplotlib.pyplot as plt
+import time
 warnings.filterwarnings('ignore')
 
 #paths setup
@@ -260,25 +263,46 @@ def train_model(df: pd.DataFrame, feature_cols: list, level: str = "Ward") -> Tu
     y_train = train_df['burglaries']
     y_test = test_df['burglaries']
     
-    #initialize model with tuned parameters
-    model = xgb.XGBRegressor(
-        n_estimators=200,
-        learning_rate=0.05,
-        max_depth=6,
-        min_child_weight=3,
-        subsample=0.8,
-        colsample_bytree=0.8,
+    # ---------------- hyper-parameter search ----------------------
+    tscv = TimeSeriesSplit(n_splits=3)          #keeps chronology
+
+    param_dist = {
+        "n_estimators":     randint(400, 1600),
+        "learning_rate":    uniform(0.015, 0.085),
+        "max_depth":        randint(4, 10),
+        "min_child_weight": randint(1, 8),
+        "gamma":            uniform(0, 5),
+        "subsample":        uniform(0.6, 0.4),
+        "colsample_bytree": uniform(0.6, 0.4),
+        "reg_alpha":        loguniform(1e-4, 1),
+        "reg_lambda":       loguniform(1e-2, 10),
+    }
+
+    base_model = xgb.XGBRegressor(
+        objective="count:poisson",         #better for integer counts
+        tree_method="hist",
+        eval_metric="rmse",
         random_state=42,
-        eval_metric=['rmse', 'mae'],
-        early_stopping_rounds=20
+        n_jobs=-1
     )
-    
-    #train model with evaluation set
-    model.fit(
-        X_train, y_train,
-        eval_set=[(X_train, y_train), (X_test, y_test)],
-        verbose=False
+
+    search = RandomizedSearchCV(
+        estimator=base_model,
+        param_distributions=param_dist,
+        n_iter=50,                        #~50 random combos
+        cv=tscv,
+        scoring="neg_root_mean_squared_error",
+        verbose=1,
+        n_jobs=-1,
+        refit=True,
+        return_train_score=False,
     )
+
+    search.fit(X_train, y_train)
+    model = search.best_estimator_
+
+    print("\nBest CV RMSE:", -search.best_score_)
+    print("Best parameters:", search.best_params_)
 
     # --- Statistics ---
     y_pred = model.predict(X_test)
@@ -533,6 +557,8 @@ def predict_next_n_months(df: pd.DataFrame,
     return final_predictions.sort_values(['Month', 'Ward'])
 
 def main():
+    start_time = time.perf_counter()
+    
     print("Loading ward-level data...")
     df = pd.read_parquet(PROCESSED / "ward_month_burglary.parquet")
     print("\nPreparing ward-level features...")
@@ -568,5 +594,10 @@ def main():
     first_month_lsoa = lsoa_predictions['Month'].min()
     print(lsoa_predictions[lsoa_predictions['Month'] == first_month_lsoa][['LSOA', 'Month', 'Predicted_Burglaries', 'Lower_CI', 'Upper_CI']])
     
+    elapsed = time.perf_counter() - start_time
+    hrs, rem = divmod(elapsed, 3600)
+    mins, secs = divmod(rem, 60)
+    print(f"\nTotal runtime: {int(hrs):02d}:{int(mins):02d}:{secs:05.2f} (hh:mm:ss)")
+
 if __name__ == "__main__":
     main()
