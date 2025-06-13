@@ -31,8 +31,7 @@ Our pipeline processes raw police data into ward-level and LSOA-level aggregatio
 
 ## Data Requirements
 - **Raw Data**: Monthly crime data from [data.police.uk](https://data.police.uk/data/).
-  - Already in the repository: Raw data December 2010 - February 2025.
-  - If you want to add future data, follow these steps:
+  - To add the raw data, follow these steps:
       - Download street-level crime data for Metropolitan Police
       - Place in `data/YYYY-MM/` folders
       - Files should be named `YYYY-MM-metropolitan-street.csv`
@@ -176,7 +175,7 @@ These features combine to help the model understand temporal patterns and local 
    - Police force resource allocation for each ward and LSOA based on the predictions
 
 ## Authors
-Group 34 - TU/e - Addressing real-world crime and security problems with data science (4CBLW00-20) course
+Group 34 - TU/e - Addressing real-world crime and security problems with data science (4CBLW00-20) course.
 
 ## License
 This project is part of the TU/e Addressing real-world crime and security problems with data science (4CBLW00-20) course and is intended for educational purposes.
