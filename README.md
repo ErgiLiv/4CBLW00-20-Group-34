@@ -23,7 +23,7 @@ Our pipeline processes raw police data into ward-level and LSOA-level aggregatio
    python scripts/ingest_burglary.py   #Run time: ~3 minutes (depending on device performance)
    ```
    ```bash            
-   python scripts/xgboost_predictions_12m.py    #Run time: ~1 hour (depending on device performance)
+   python scripts/xgboost_predictions_12m.py    #Run time: ~15 minutes (depending on device performance)
    ```
    ```bash            
    streamlit run scripts/streamlit_app_12m.py    #Loading time: ~30 seconds
