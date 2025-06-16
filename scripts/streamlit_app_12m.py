@@ -23,14 +23,15 @@ from streamlit_folium import st_folium
 
 # ── policing-resource constants ─────────────────────────────────────────────
 OFFICERS_PER_WARD          = 100           # head-count per ward
-SHIFTS_PER_OFFICER_WEEK    = 4             # ≤4 burglary days each
+SHIFTS_PER_OFFICER_WEEK    = 4             # <=4 burglary days each
 HOURS_PER_SHIFT            = 2             # 2-h burglary window
 SHIFTS_WEEKLY_CAP          = OFFICERS_PER_WARD * SHIFTS_PER_OFFICER_WEEK  # 400
-CAPACITY_PER_SLOT          = OFFICERS_PER_WARD                            # ≤100
+CAPACITY_PER_SLOT          = OFFICERS_PER_WARD                            # <=100
 SPECIAL_OP_PERIOD          = 4             # unchanged
 # ── demand model parameters ────────────────────────────────────────────────
-MIN_WEEKLY_SHIFTS     = 4     # baseline presence (2 patrol teams / week)
-SHIFT_FACTOR_PER_BURG = 1.5   # extra weekly shifts per predicted burglary
+SHIFT_FACTOR_PER_BURG = 3.0           # extra shifts per predicted burglary
+# one patrol pair (2 officers) in every one of the 56 weekly slots ⇒ 112 shifts
+MIN_WEEKLY_SHIFTS     = 56 * 2        # 112
 
 def weeks_in_month(ts: pd.Timestamp) -> float:          # new helper
     return calendar.monthrange(ts.year, ts.month)[1] / 7.0
@@ -38,10 +39,18 @@ def weeks_in_month(ts: pd.Timestamp) -> float:          # new helper
 # ── demand helper -----------------------------------------------------------
 def weekly_shift_demand(predicted_burglaries: float) -> int:
     """Return integer officer-shifts needed per week for one ward."""
-    if predicted_burglaries <= 0:
-        return 0
-    demand = MIN_WEEKLY_SHIFTS + math.ceil(predicted_burglaries * SHIFT_FACTOR_PER_BURG)
-    return min(demand, SHIFTS_WEEKLY_CAP)
+    demand  = max(MIN_WEEKLY_SHIFTS,
+                MIN_WEEKLY_SHIFTS + math.ceil(predicted_burglaries * SHIFT_FACTOR_PER_BURG))
+    demand  = min(demand, SHIFTS_WEEKLY_CAP)   # never exceed 400
+    demand += demand % 2                       # force even (adds +1 if odd)
+    return demand
+
+# Uncapped version – used only for special-operation sizing
+def raw_weekly_shift_demand(predicted_burglaries: float) -> int:
+    demand  = max(MIN_WEEKLY_SHIFTS,
+                  MIN_WEEKLY_SHIFTS + math.ceil(predicted_burglaries * SHIFT_FACTOR_PER_BURG))
+    demand += demand % 2          # force even
+    return demand                 # NO capacity clip
 
 # ── time-slot helpers -------------------------------------------------------
 TIME_SLOTS  = [(6,8),(8,10),(10,12),(12,14),(14,16),(16,18),(18,20),(20,22)]
@@ -50,51 +59,45 @@ SLOT_LABELS = [f"{s:02d}:00-{e:02d}:00" for s,e in TIME_SLOTS]
 def sunset_hour(month:int) -> int:          # very coarse London sunset switch
     return 20 if 4 <= month <= 9 else 18    # Apr-Sep vs Oct-Mar
 
-# ── WEEKLY rota builder (replaces old month → week round-trip) ─────────────
+# ── WEEKLY schedule builder — every slot gets >= 1 pair (2 officers) ────────────
 def build_weekly_schedule(shifts_week:int, month_ts:pd.Timestamp,
-                          mult:float = 1.25) -> tuple[pd.DataFrame, int]:
+                          mult:float = 1.25,
+                          baseline_pairs_per_slot:int = 1
+                          ) -> tuple[pd.DataFrame, int]:
     """
-    Build a 7x8 table of officer-shifts for one week.
-
-    Parameters
-    ----------
-    shifts_week : int
-        Exact number of officer-shifts that must be scheduled this week.
-    month_ts : pd.Timestamp
-        Any date in the month - used only to decide the sunset cut-off.
-    mult : float
-        After-dark weight multiplier.
-
-    Returns
-    -------
-    schedule : DataFrame  (index = Mon…Sun, columns = 06-08 … 20-22)
-    unmet     : int       (shifts that could not be placed because weekly
-                           demand exceeded the 400-shift capacity)
+    Returns a 7x8 table whose cells are 0,2,4… officers,
+    **never less than two per slot**, and whose total equals `shifts_week`.
     """
-    sched_week = min(shifts_week, SHIFTS_WEEKLY_CAP)
-    unmet      = shifts_week - sched_week           # overflow, if any
+    # safety: even & clipped
+    shifts_week = min(shifts_week + shifts_week % 2, SHIFTS_WEEKLY_CAP)
 
-    # 1. weights for the 8 slots
+    total_pairs    = shifts_week // 2
+    base_pairs     = 56 * baseline_pairs_per_slot
+    extra_pairs    = max(0, total_pairs - base_pairs)
+
+    # slot weights (after-dark boost)
     sun_cut  = sunset_hour(month_ts.month)
     slot_w   = [mult if s >= sun_cut else 1.0 for s, _ in TIME_SLOTS]
-
-    # 2. repeat that vector for seven days
     weights  = np.array(slot_w * 7, dtype=float)
-    raw      = weights / weights.sum() * sched_week
 
-    # 3. integer allocation that preserves the total
-    floor    = np.floor(raw).astype(int)
-    rem      = sched_week - floor.sum()
-    order    = np.argsort(raw - floor)[::-1]
-    floor[order[:rem]] += 1
+    if extra_pairs:
+        raw      = weights / weights.sum() * extra_pairs
+        pairs    = np.floor(raw).astype(int)
+        rem      = extra_pairs - pairs.sum()
+        order    = np.argsort(raw - pairs)[::-1]
+        pairs[order[:rem]] += 1              # distribute the remainder
+    else:
+        pairs    = np.zeros(56, dtype=int)
 
-    # 4. reshape into the 7×8 rota
-    rota     = floor.reshape(7, len(TIME_SLOTS))
-    df       = pd.DataFrame(rota,
-                            index=["Mon", "Tue", "Wed", "Thu",
-                                   "Fri", "Sat", "Sun"],
-                            columns=SLOT_LABELS)
-    return df, unmet
+    pairs += baseline_pairs_per_slot         # add the chosen baseline (0 or 1)
+    schedule  = (pairs * 2).reshape(7, len(TIME_SLOTS))
+
+    df = pd.DataFrame(
+        schedule,
+        index=["Mon","Tue","Wed","Thu","Fri","Sat","Sun"],
+        columns=SLOT_LABELS
+    )
+    return df, 0      # unmet=0 because demand <= 400 and baseline fits daily cap
 
 # ── data paths --------------------------------------------------------------
 ROOT = pathlib.Path(__file__).resolve().parent.parent  #go up one level to project root
@@ -412,12 +415,7 @@ if view_mode == "Future Forecast":
     if forecast_type == "Ward Forecast":
         search = st.text_input("Search by Ward name or code", "")
         combined_df = df_show[[id_col, name_col, "Predicted_Burglaries"]].copy()
-        if "Lower_CI" in df_show.columns and "Upper_CI" in df_show.columns:
-            combined_df["Confidence Range"] = df_show.apply(
-                lambda x: f"{x['Predicted_Burglaries']:.0f} ({x['Lower_CI']:.0f}-{x['Upper_CI']:.0f})",
-                axis=1
-            )
-        combined_df.columns = ["Code", "Name", "Predicted Burglaries", "Confidence Range"]
+        combined_df.columns = ["Code", "Name", "Predicted Burglaries"]
         if search:
             mask = (combined_df["Name"].str.contains(search, case=False)) | (combined_df["Code"].str.contains(search, case=False))
             combined_df = combined_df[mask]
@@ -425,12 +423,7 @@ if view_mode == "Future Forecast":
     else:  #LSOA Forecast table
         search = st.text_input("Search by LSOA name or code", "")
         combined_df = df_show[["LSOA21CD", "LSOA21NM", "Predicted_Burglaries"]].copy()
-        if "Lower_CI" in df_show.columns and "Upper_CI" in df_show.columns:
-            combined_df["Confidence Range"] = df_show.apply(
-                lambda x: f"{x['Predicted_Burglaries']:.0f} ({x['Lower_CI']:.0f}-{x['Upper_CI']:.0f})",
-                axis=1
-            )
-        combined_df.columns = ["Code", "Name", "Predicted Burglaries", "Confidence Range"]
+        combined_df.columns = ["Code", "Name", "Predicted Burglaries"]
         if search:
             mask = (combined_df["Name"].str.contains(search, case=False)) | (combined_df["Code"].str.contains(search, case=False))
             combined_df = combined_df[mask]
@@ -598,10 +591,10 @@ if view_mode == "Future Forecast":
 
     after_dark_mult = st.sidebar.slider(
     "After-dark multiplier (18:00/20:00-22:00)",
-    1.0, 2.0, 1.25, 0.05,
+    1.0, 4.0, 2.0, 0.1,
     help="Weight evening slots more heavily when distributing the weekly officer shifts."
     )
-    
+
 else:
     show_alloc = False
 
@@ -614,12 +607,12 @@ if show_alloc and view_mode == "Future Forecast":
         df_alloc = df_show.copy()
 
         #weekly shift demand & stress
-        df_alloc["Shifts (week)"] = df_alloc["Predicted_Burglaries"].apply(weekly_shift_demand)
-        df_alloc["Stress"]        = df_alloc["Shifts (week)"] / SHIFTS_WEEKLY_CAP
+        df_alloc["Allocated officers/week"] = df_alloc["Predicted_Burglaries"].apply(weekly_shift_demand)
+        df_alloc["Stress"]        = df_alloc["Allocated officers/week"] / SHIFTS_WEEKLY_CAP
 
         alloc_tbl = (
             df_alloc[[id_col, name_col, "Predicted_Burglaries",
-                    "Shifts (week)", "Stress"]]
+                    "Allocated officers/week", "Stress"]]
             .rename(columns={id_col: "Code",
                             name_col: "Ward",
                             "Predicted_Burglaries": "Pred burglaries"})
@@ -636,9 +629,9 @@ if show_alloc and view_mode == "Future Forecast":
         st.dataframe(alloc_tbl, use_container_width=True)
 
         # ── NEW: day-by-day 2-h slot schedule ─────────────────────────────────
-        st.markdown("#### Weekly burglary-patrol rota (2-hour slots)")
+        st.markdown("#### Weekly schedule for selected ward (number of allocated officers per 2-hour slot)")
 
-        ward_choice = st.selectbox("Select ward for rota",
+        ward_choice = st.selectbox("Select ward for schedule",
                                 options=df_alloc[name_col].values,
                                 index=0, key="sched_ward")
 
@@ -648,7 +641,8 @@ if show_alloc and view_mode == "Future Forecast":
 
         sched_df, unmet = build_weekly_schedule(shifts_week,
                                                 selected_forecast_date,
-                                                after_dark_mult)
+                                                after_dark_mult,
+                                                baseline_pairs_per_slot=1)
 
         st.dataframe(sched_df, use_container_width=True)
 
@@ -657,61 +651,89 @@ if show_alloc and view_mode == "Future Forecast":
                     "not be scheduled within the 4-day-per-officer rule. "
                     "Consider overtime or a special operation.")
 
-        # ── Special-operation targets (once / 4 months) ────────────────────────────
-        next4 = pd.date_range(selected_forecast_date, periods=4, freq="MS")
-        future4 = xgboost_pred[xgboost_pred["Month"].isin(next4)].copy()
-        future4["week_shifts"] = future4["Predicted_Burglaries"].apply(weekly_shift_demand)
-        future4["extra"] = np.maximum(future4["week_shifts"] - SHIFTS_WEEKLY_CAP, 0)
+        # ── Special-operation targets (once / 4 months) ───────────────────────────
+        next4     = pd.date_range(selected_forecast_date, periods=4, freq="MS")
+        future4   = xgboost_pred[xgboost_pred["Month"].isin(next4)].copy()
 
+        # raw (uncapped) weekly demand
+        future4["raw_week_shifts"] = future4["Predicted_Burglaries"].apply(raw_weekly_shift_demand)
 
-        spec_tbl = (future4.groupby("Ward")["extra"]
-                            .sum().reset_index()
-                            .query("extra > 0")
-                            .sort_values("extra", ascending=False)
-                            .head(10)
-                            .rename(columns={"extra": "Total extra officers"}))
+        # overflow above routine capacity
+        future4["over_cap"] = future4["raw_week_shifts"] - SHIFTS_WEEKLY_CAP
+        future4["over_cap"] = future4["over_cap"].clip(lower=0)
+
+        # buffer when stress >= 0.80  (adds 20 % extra, rounded down to even)
+        future4["stress"]   = future4["raw_week_shifts"] / SHIFTS_WEEKLY_CAP
+        future4["buffer"]   = np.where(
+            future4["stress"] >= 0.80, (0.20 * future4["raw_week_shifts"] // 2 * 2).astype(int), 0)
+
+        # total extra shifts required for a special-op week
+        future4["extra"] = (future4["over_cap"] + future4["buffer"]).astype(int)
+        future4["extra"] = (future4["extra"] // 2 * 2)   # ensure even
+
+        # summarise: one row per ward over the 4-month window
+        spec_tbl = (future4.groupby("Ward")[["extra"]]
+                    .max()                        # max requirement in the window
+                    .query("extra > 0")
+                    .sort_values("extra", ascending=False)
+                    .head(10)
+                    .rename(columns={"extra": "Extra officers/week"}))
 
         st.markdown("#### Suggested special-operation wards (next 4 months)")
         if spec_tbl.empty:
-            st.write("No wards exceed routine capacity in the next four-month window.")
+            st.write("No ward exceeds the surge-trigger threshold in the next four-month window.")
         else:
             st.table(spec_tbl)
+            
+        st.markdown(
+            "Note: A ward is considered 'stressed' when its raw weekly shift demand reaches at least 80% of the total capacity. "
+            "For such wards, an extra buffer equivalent to 20% of the raw demand (rounded down to an even number) is added to account for potential surges."
+        )
 
     else:  #LSOA Forecast
 
-        st.markdown("### Within-ward officer split across LSOAs")
+        st.markdown("### Within-ward shift split across LSOAs")
 
         lkp = pd.read_csv(LOOKUP_CSV)[["LSOA21CD", "WD24CD", "WD24NM"]]
         lsoa_w = df_show.merge(lkp, on="LSOA21CD", how="left")
 
         wards_available = sorted(lsoa_w["WD24NM"].dropna().unique())
-        sel_ward = st.selectbox("Ward to split its 100 officers", wards_available)
+        sel_ward = st.selectbox("Ward to split its 700 officers/week (100 officers/day)", wards_available)
 
         #compute aggregated ward-level predictions to determine total predicted burglaries and required officers per ward
         ward_alloc = lsoa_w.groupby("WD24NM").agg({"Predicted_Burglaries": "sum"}).reset_index()
-        ward_alloc["Shifts (week)"] = ward_alloc["Predicted_Burglaries"].apply(weekly_shift_demand)
-        ward_need = int(ward_alloc.loc[ward_alloc["WD24NM"] == sel_ward, "Shifts (week)"].iloc[0])
+        ward_alloc["Allocated officers/week"] = ward_alloc["Predicted_Burglaries"].apply(weekly_shift_demand)
+        ward_need = int(ward_alloc.loc[ward_alloc["WD24NM"] == sel_ward, "Allocated officers/week"].iloc[0])
 
         total_burg = lsoa_w[lsoa_w["WD24NM"] == sel_ward]["Predicted_Burglaries"].sum()
 
         if ward_need == 0 or total_burg == 0:
             st.info("No officers required for this ward.")
         else:
-            #proportional split of <ward_need> officers across LSOAs in the ward
+            # ── proportional split of `ward_need` shifts across LSOAs (even numbers) ──
             ward_lsoas = lsoa_w[lsoa_w["WD24NM"] == sel_ward].copy()
-            ward_lsoas["raw"]   = ward_lsoas["Predicted_Burglaries"] / total_burg * ward_need
-            ward_lsoas["floor"] = np.floor(ward_lsoas["raw"]).astype(int)
-            remainder = ward_need - ward_lsoas["floor"].sum()
-            ward_lsoas["fraction"] = ward_lsoas["raw"] - ward_lsoas["floor"]
-            ward_lsoas = ward_lsoas.sort_values("fraction", ascending=False)
-            ward_lsoas.iloc[:remainder, ward_lsoas.columns.get_loc("floor")] += 1
-            ward_lsoas = ward_lsoas.sort_values("floor", ascending=False)
 
-            lsoa_alloc_tbl = ward_lsoas[["LSOA21CD", "LSOA21NM", "Predicted_Burglaries", "floor"]].rename(
+            # 1. raw proportional share
+            ward_lsoas["raw"] = (ward_lsoas["Predicted_Burglaries"] /
+                                total_burg * ward_need)
+
+            # 2. round **down** to nearest even number (pairs)
+            ward_lsoas["even"] = (ward_lsoas["raw"] // 2 * 2).astype(int)
+
+            # 3. distribute leftover pairs to highest fractional parts
+            pairs_left   = (ward_need - ward_lsoas["even"].sum()) // 2
+            ward_lsoas["fraction"] = ward_lsoas["raw"] - ward_lsoas["even"]
+            ward_lsoas.sort_values("fraction", ascending=False, inplace=True)
+            ward_lsoas.iloc[:pairs_left, ward_lsoas.columns.get_loc("even")] += 2
+
+            # 4. tidy up
+            ward_lsoas.sort_values("even", ascending=False, inplace=True)
+            ward_lsoas.rename(columns={"even": "Allocated officers/week"}, inplace=True)
+            lsoa_alloc_tbl = ward_lsoas[["LSOA21CD", "LSOA21NM",
+                                        "Predicted_Burglaries", "Allocated officers/week"]].rename(
                 columns={"LSOA21CD": "LSOA code",
                         "LSOA21NM": "LSOA",
-                        "Predicted_Burglaries": "Pred burglaries",
-                        "floor": "Allocated shifts"}
+                        "Predicted_Burglaries": "Pred burglaries"}
             )
 
             #new: add search input for filtering by LSOA Code or Name
@@ -722,4 +744,24 @@ if show_alloc and view_mode == "Future Forecast":
                     lsoa_alloc_tbl["LSOA"].str.contains(search_alloc_lsoa, case=False)
                 ]
             st.dataframe(lsoa_alloc_tbl, use_container_width=True)
+
+            # ── LSOA-level schedule ---------------------------------------------------------
+            st.markdown("#### Weekly schedule for selected LSOA (number of allocated officers per 2-hour slot)")
+
+            lsoa_choice = st.selectbox("Select LSOA for schedule",
+                                    options=lsoa_alloc_tbl["LSOA"].values,
+                                    key="lsoa_schedule_choice")
+
+            lsoa_shifts = int(lsoa_alloc_tbl.loc[
+                lsoa_alloc_tbl["LSOA"] == lsoa_choice, "Allocated officers/week"
+            ].iloc[0])
+
+            lsoa_sched_df, _ = build_weekly_schedule(
+                lsoa_shifts,
+                selected_forecast_date,
+                after_dark_mult,
+                baseline_pairs_per_slot=0          # no automatic pair per slot
+            )
+
+            st.dataframe(lsoa_sched_df, use_container_width=True)
             
